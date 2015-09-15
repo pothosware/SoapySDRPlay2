@@ -109,17 +109,29 @@ std::complex<double> SoapySDRPlay::getDCOffset(const int direction, const size_t
 
 std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
 {
-    
+    //list available gain elements,
+    //the functions below have a "name" parameter
+}
+
+void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
+{
+    //enable AGC if the hardware supports it, or remove this function
+}
+
+bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
+{
+    //ditto for the AGC
 }
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
 {
-    
+    //set the overall gain by distributing it across available gain elements
+    //OR delete this function to use SoapySDR's default gain distribution algorithm...
 }
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
-    
+    //set individual gain element by name
 }
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
