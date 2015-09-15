@@ -19,6 +19,13 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     //any format that we want to use is going
     //to be converted from the driver's native type
     //record the format somehow so we know what format to use for readStream
+    //probably want to support CF32 for complex floats
+    //and CS16 for complex shorts
+
+    //use args to specify optional things like:
+    //integer to float scale factors
+    //number of transfers and or transfer size
+    //depends what the hardware supports...
 
     //this device probably only supports one stream
     //so the stream pointer probably doesn't matter
