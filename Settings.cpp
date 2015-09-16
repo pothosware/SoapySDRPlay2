@@ -13,14 +13,14 @@
 #include <iostream>
 
 static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw) {
-    if (bw == 0.2) return mir_sdr_BW_0_200;
-    if (bw == 0.3) return mir_sdr_BW_0_300;
-    if (bw == 0.6) return mir_sdr_BW_0_600;
-    if (bw == 1.536) return mir_sdr_BW_1_536;
-    if (bw == 5.0) return mir_sdr_BW_1_536;
-    if (bw == 6.0) return mir_sdr_BW_6_000;
-    if (bw == 7.0) return mir_sdr_BW_7_000;
-    if (bw == 8.0) return mir_sdr_BW_8_000;
+    if (bw == 200000) return mir_sdr_BW_0_200;
+    if (bw == 300000) return mir_sdr_BW_0_300;
+    if (bw == 600000) return mir_sdr_BW_0_600;
+    if (bw == 1536000) return mir_sdr_BW_1_536;
+    if (bw == 5000000) return mir_sdr_BW_1_536;
+    if (bw == 6000000) return mir_sdr_BW_6_000;
+    if (bw == 7000000) return mir_sdr_BW_7_000;
+    if (bw == 8000000) return mir_sdr_BW_8_000;
 
     return mir_sdr_BW_1_536;
 }
@@ -48,7 +48,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     grChangedAfter = 0;
     centerFreq = 222.064;
     rate = 2.048;
-    bw = 1.536;
+    bw = 15360000;
     // Configure DC tracking in tuner
     err = mir_sdr_SetDcMode(4,0);
     err = mir_sdr_SetDcTrackTime(63);
@@ -243,7 +243,7 @@ SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const s
     if (name == "RF")
     {
         SoapySDR::RangeList rl;
-        rl.push_back(SoapySDR::Range(0.1,2000.0));
+        rl.push_back(SoapySDR::Range(100000.0,2000000000.0));
         return rl;
     }
 }
@@ -267,6 +267,8 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> rates;
 
+    rates.push_back(200000);
+    rates.push_back(8000000);
     
     return rates;
 }
@@ -284,13 +286,13 @@ double SoapySDRPlay::getBandwidth(const int direction, const size_t channel) con
 std::vector<double> SoapySDRPlay::listBandwidths(const int direction, const size_t channel) const
 {
     std::vector<double> bandwidths;
-    bandwidths.push_back(0.200);
-    bandwidths.push_back(0.300);
-    bandwidths.push_back(0.600);
-    bandwidths.push_back(1.536);
-    bandwidths.push_back(5.000);
-    bandwidths.push_back(6.000);
-    bandwidths.push_back(7.000);
-    bandwidths.push_back(8.000);
+    bandwidths.push_back(200000);
+    bandwidths.push_back(300000);
+    bandwidths.push_back(600000);
+    bandwidths.push_back(1536000);
+    bandwidths.push_back(5000000);
+    bandwidths.push_back(6000000);
+    bandwidths.push_back(7000000);
+    bandwidths.push_back(8000000);
     return bandwidths;
 }
