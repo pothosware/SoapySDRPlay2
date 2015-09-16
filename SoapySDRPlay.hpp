@@ -93,19 +93,19 @@ public:
      * Gain API
      ******************************************************************/
 
-    std::vector<std::string> listGains(const int direction, const size_t channel) const;
-
-    void setGainMode(const int direction, const size_t channel, const bool automatic);
-
-    bool getGainMode(const int direction, const size_t channel) const;
-
-    void setGain(const int direction, const size_t channel, const double value);
-
-    void setGain(const int direction, const size_t channel, const std::string &name, const double value);
-
-    double getGain(const int direction, const size_t channel, const std::string &name) const;
-
-    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
+//    std::vector<std::string> listGains(const int direction, const size_t channel) const;
+//
+//    void setGainMode(const int direction, const size_t channel, const bool automatic);
+//
+//    bool getGainMode(const int direction, const size_t channel) const;
+//
+//    void setGain(const int direction, const size_t channel, const double value);
+//
+//    void setGain(const int direction, const size_t channel, const std::string &name, const double value);
+//
+//    double getGain(const int direction, const size_t channel, const std::string &name) const;
+//
+//    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
     /*******************************************************************
      * Frequency API
@@ -140,7 +140,7 @@ private:
     //device handle
 
     //cached settings
-    float version;
+    float ver;
     bool dcOffsetMode;
     int sps;
     int grc;

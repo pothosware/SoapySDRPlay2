@@ -31,11 +31,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     //like by checking the serial or enumeration number
     mir_sdr_ErrT err;
 
-    err = mir_sdr_ApiVersion(&version);
-    std::cout << "mir_sdr version: " <<  version << std::endl;
-    if (version != MIR_SDR_API_VERSION)
+    err = mir_sdr_ApiVersion(&ver);
+    if (ver != MIR_SDR_API_VERSION)
     {
-        std::cout << "warning: mir_sdr version " << std::to_string(version) << " does not equal " + std::to_string(MIR_SDR_API_VERSION) << std::cout;
+        std::cout << "warning: mir_sdr version: '" << std::to_string(ver) << "' does not equal build version: '" + std::to_string(MIR_SDR_API_VERSION) << "'" << std::cout;
     }
 
     dcOffsetMode = false;
@@ -58,6 +57,9 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    mir_sdr_ErrT err;
+
+    err = mir_sdr_Uninit();
     //cleanup device handles
 }
 
@@ -79,6 +81,15 @@ SoapySDR::Kwargs SoapySDRPlay::getHardwareInfo(void) const
 {
     //key/value pairs for any useful information
     //this also gets printed in --probe
+    SoapySDR::Kwargs hwArgs;
+
+    mir_sdr_ErrT err;
+
+
+
+    hwArgs["mir_sdr_version"] = std::to_string(ver);
+
+    return hwArgs;
 }
 
 /*******************************************************************
@@ -162,42 +173,42 @@ void SoapySDRPlay::setDCOffset(const int direction, const size_t channel, const 
  * Gain API
  ******************************************************************/
 
-std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
-{
-    //list available gain elements,
-    //the functions below have a "name" parameter
-}
-
-void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
-{
-    //enable AGC if the hardware supports it, or remove this function
-}
-
-bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
-{
-    //ditto for the AGC
-}
-
-void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
-{
-    //set the overall gain by distributing it across available gain elements
-    //OR delete this function to use SoapySDR's default gain distribution algorithm...
-}
-
-void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
-{
-    //set individual gain element by name
-}
-
-double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
-{
-    
-}
-
-SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
-{
-    
-}
+//std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
+//{
+//    //list available gain elements,
+//    //the functions below have a "name" parameter
+//}
+//
+//void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
+//{
+//    //enable AGC if the hardware supports it, or remove this function
+//}
+//
+//bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
+//{
+//    //ditto for the AGC
+//}
+//
+//void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+//{
+//    //set the overall gain by distributing it across available gain elements
+//    //OR delete this function to use SoapySDR's default gain distribution algorithm...
+//}
+//
+//void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
+//{
+//    //set individual gain element by name
+//}
+//
+//double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
+//{
+//
+//}
+//
+//SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
+//{
+//
+//}
 
 /*******************************************************************
  * Frequency API
