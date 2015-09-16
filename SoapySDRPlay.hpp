@@ -69,7 +69,7 @@ public:
 
     std::vector<std::string> listAntennas(const int direction, const size_t channel) const;
 
-    void setAntenna(const int direction, const size_t channel, const std::string &name);
+//    void setAntenna(const int direction, const size_t channel, const std::string &name);
 
     std::string getAntenna(const int direction, const size_t channel) const;
 
@@ -87,7 +87,7 @@ public:
 
     void setDCOffset(const int direction, const size_t channel, const std::complex<double> &offset);
 
-    std::complex<double> getDCOffset(const int direction, const size_t channel) const;
+//    std::complex<double> getDCOffset(const int direction, const size_t channel) const;
 
     /*******************************************************************
      * Gain API
@@ -137,9 +137,17 @@ public:
 
 private:
 
-    //TODO
+    //device handle
 
-    //device handle...
-
-    //cached settings...
+    //cached settings
+    float version;
+    bool dcOffsetMode;
+    int sps;
+    int grc;
+    int grChangedAfter;
+    int newGr;
+    int oldGr;
+    double centerFreq;
+    double rate;
+    double bw;
 };
