@@ -5,7 +5,14 @@
 
 #pragma once
 
+#include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
+
+#if __APPLE__
+    #include <mir_sdr.h>
+#else
+    #include <mirsdrapi-rsp.h>
+#endif
 
 class SoapySDRPlay : public SoapySDR::Device
 {
@@ -137,17 +144,31 @@ public:
 
 private:
 
+    static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
+
     //device handle
+
+    //stream
+//    short *xi;
+//    short *xq;
+    std::vector<short> xi;
+    std::vector<short> xi_buffer;
+    std::vector<short> xq;
+    std::vector<short> xq_buffer;
+    unsigned int fs;
+    int syncUpdate;
 
     //cached settings
     float ver;
     bool dcOffsetMode;
     int sps;
-    int grc;
+    int grc, rfc, fsc;
     int grChangedAfter;
     int newGr;
     int oldGr;
     double centerFreq;
     double rate;
     double bw;
+
+    bool convertFloat;
 };

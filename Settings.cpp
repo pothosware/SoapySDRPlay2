@@ -4,26 +4,7 @@
  */
 
 #include "SoapySDRPlay.hpp"
-#if __APPLE__
-    #include <mir_sdr.h>
-#else
-    #include <mirsdrapi-rsp.h>
-#endif
-#include <string>
-#include <iostream>
 
-static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw) {
-    if (bw == 200000) return mir_sdr_BW_0_200;
-    if (bw == 300000) return mir_sdr_BW_0_300;
-    if (bw == 600000) return mir_sdr_BW_0_600;
-    if (bw == 1536000) return mir_sdr_BW_1_536;
-    if (bw == 5000000) return mir_sdr_BW_1_536;
-    if (bw == 6000000) return mir_sdr_BW_6_000;
-    if (bw == 7000000) return mir_sdr_BW_7_000;
-    if (bw == 8000000) return mir_sdr_BW_8_000;
-
-    return mir_sdr_BW_1_536;
-}
 
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
@@ -34,7 +15,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     err = mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)
     {
-        std::cout << "warning: mir_sdr version: '" << std::to_string(ver) << "' does not equal build version: '" + std::to_string(MIR_SDR_API_VERSION) << "'" << std::cout;
+        std::string errStr("mir_sdr version: '" + std::to_string(ver) + "' does not equal build version: '" + std::to_string(MIR_SDR_API_VERSION) + "'");
+        SoapySDR_log(SOAPY_SDR_WARNING, errStr.c_str());
     }
 
     dcOffsetMode = false;
@@ -49,17 +31,11 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     centerFreq = 222.064;
     rate = 2.048;
     bw = 15360000;
-    // Configure DC tracking in tuner
-    err = mir_sdr_SetDcMode(4,0);
-    err = mir_sdr_SetDcTrackTime(63);
-    err = mir_sdr_Init(newGr, rate, centerFreq, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+    syncUpdate = 0;
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
-    mir_sdr_ErrT err;
-
-    err = mir_sdr_Uninit();
     //cleanup device handles
 }
 
@@ -218,6 +194,7 @@ void SoapySDRPlay::setFrequency(const int direction, const size_t channel, const
 {
     if (name == "RF")
     {
+        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed center frequency");
         centerFreq = frequency;
         mir_sdr_SetRf(centerFreq, 1, 0);
     }
@@ -254,6 +231,7 @@ SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const s
 
 void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate)
 {
+    SoapySDR_log(SOAPY_SDR_DEBUG,"Set sample rate");
     this->rate = rate;
     mir_sdr_SetFs(rate, 1, 0, 0);
 }
@@ -275,6 +253,7 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 
 void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const double bw)
 {
+    SoapySDR_log(SOAPY_SDR_DEBUG,"Set bandwidth");
     this->bw = bw;
 }
 
@@ -295,4 +274,19 @@ std::vector<double> SoapySDRPlay::listBandwidths(const int direction, const size
     bandwidths.push_back(7000000);
     bandwidths.push_back(8000000);
     return bandwidths;
+}
+
+
+
+mir_sdr_Bw_MHzT SoapySDRPlay::mirGetBwMhzEnum(double bw) {
+    if (bw == 200000) return mir_sdr_BW_0_200;
+    if (bw == 300000) return mir_sdr_BW_0_300;
+    if (bw == 600000) return mir_sdr_BW_0_600;
+    if (bw == 1536000) return mir_sdr_BW_1_536;
+    if (bw == 5000000) return mir_sdr_BW_1_536;
+    if (bw == 6000000) return mir_sdr_BW_6_000;
+    if (bw == 7000000) return mir_sdr_BW_7_000;
+    if (bw == 8000000) return mir_sdr_BW_8_000;
+
+    return mir_sdr_BW_1_536;
 }
