@@ -146,8 +146,8 @@ int SoapySDRPlay::readStream(
             ((short *)buff0)[i*2+1] = xq_buffer[i];
         }
     }
-    xi_buffer.erase(xi_buffer.begin(),xi_buffer.begin()+sps);
-    xi_buffer.erase(xq_buffer.begin(),xq_buffer.begin()+sps);
+    xi_buffer.erase(xi_buffer.begin(),xi_buffer.begin()+returnedElems);
+    xi_buffer.erase(xq_buffer.begin(),xq_buffer.begin()+returnedElems);
 
     //return number of elements written to buff0
     return returnedElems;
