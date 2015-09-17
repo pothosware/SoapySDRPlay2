@@ -19,6 +19,7 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     }
 
     //check than channels is either empty or [0]
+    //TODO: necessary?
 
     //check that format is a supported format,
     //any format that we want to use is going
