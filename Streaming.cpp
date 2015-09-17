@@ -115,19 +115,22 @@ int SoapySDRPlay::readStream(
     //step 1 check for data with timeout
     // TODO: Can we do?
 
-    //step 2 receive into temporary buffer
-    err = mir_sdr_ReadPacket(&xi[0], &xq[0], &fs, &grc, &rfc, &fsc);
+    // Prevent stalling if we've already buffered enough data..
+    if (xi_buffer.size() < numElems) {
+        //step 2 receive into temporary buffer
+        err = mir_sdr_ReadPacket(&xi[0], &xq[0], &fs, &grc, &rfc, &fsc);
 
-    //return SOAPY_SDR_TIMEOUT when timeout occurs
-    if (err != 0) {
-        return SOAPY_SDR_TIMEOUT;
+        //return SOAPY_SDR_TIMEOUT when timeout occurs
+        if (err != 0) {
+            return SOAPY_SDR_TIMEOUT;
+        }
+
+        //was numElems < than the hardware transfer size?
+        //may have to keep part of that temporary buffer
+        //around for the next call into readStream...
+        xi_buffer.insert(xi_buffer.end(),xi.begin(),xi.begin()+sps);
+        xq_buffer.insert(xq_buffer.end(),xq.begin(),xq.begin()+sps);
     }
-
-    //was numElems < than the hardware transfer size?
-    //may have to keep part of that temporary buffer
-    //around for the next call into readStream...
-    xi_buffer.insert(xi_buffer.end(),xi.begin(),xi.begin()+sps);
-    xq_buffer.insert(xq_buffer.end(),xq.begin(),xq.begin()+sps);
 
     int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
 
