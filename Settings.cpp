@@ -15,8 +15,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     err = mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)
     {
-        std::string errStr("mir_sdr version: '" + std::to_string(ver) + "' does not equal build version: '" + std::to_string(MIR_SDR_API_VERSION) + "'");
-        SoapySDR_log(SOAPY_SDR_WARNING, errStr.c_str());
+        SoapySDR_logf(SOAPY_SDR_WARNING, "mir_sdr version: '%.3f' does not equal build version: '%.3f'", ver, MIR_SDR_API_VERSION);
     }
 
     dcOffsetMode = false;
@@ -28,8 +27,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     newGr = 40;
     oldGr = 40;
     grChangedAfter = 0;
-    centerFreq = 222.064;
-    rate = 2.048;
+    centerFreq = 100000000;
+    rate = 2048000;
     bw = 15360000;
     syncUpdate = 0;
 }
@@ -206,6 +205,8 @@ double SoapySDRPlay::getFrequency(const int direction, const size_t channel, con
     {
         return centerFreq;
     }
+
+    return 0;
 }
 
 std::vector<std::string> SoapySDRPlay::listFrequencies(const int direction, const size_t channel) const
@@ -217,12 +218,12 @@ std::vector<std::string> SoapySDRPlay::listFrequencies(const int direction, cons
 
 SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const size_t channel, const std::string &name) const
 {
+    SoapySDR::RangeList rl;
     if (name == "RF")
     {
-        SoapySDR::RangeList rl;
         rl.push_back(SoapySDR::Range(100000.0,2000000000.0));
-        return rl;
     }
+    return rl;
 }
 
 /*******************************************************************

@@ -23,8 +23,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
     if (!mir_sdr_Init(40, 2.048, 222.064, mir_sdr_BW_1_536, mir_sdr_IF_Zero, &sps))
     {
         mir_sdr_Uninit();
-        std::string logMsg("init sps: " + std::to_string(sps));
-        SoapySDR_log(SOAPY_SDR_DEBUG, logMsg.c_str());
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "init sps: %d", sps);
         SoapySDR::Kwargs dev;
 
         dev["driver"] = "mir_sdr";

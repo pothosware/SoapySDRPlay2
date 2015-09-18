@@ -49,7 +49,7 @@ public:
 
     void closeStream(SoapySDR::Stream *stream);
 
-//    size_t getStreamMTU(SoapySDR::Stream *stream) const;
+    size_t getStreamMTU(SoapySDR::Stream *stream) const;
 
     int activateStream(
         SoapySDR::Stream *stream,
@@ -170,5 +170,5 @@ private:
     double rate;
     double bw;
 
-    bool convertFloat;
+    bool rxFloat;
 };

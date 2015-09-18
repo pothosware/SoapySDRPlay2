@@ -17,25 +17,27 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
         return NULL;
     }
 
-    //check than channels is either empty or [0]
-    //TODO: necessary?
+    //check the channel configuration
+        //check than channels is either empty or [0]
+    if (channels.size() > 1 or (channels.size() > 0 and channels.at(0) != 0))
+    {
+        throw std::runtime_error("setupStream invalid channel selection");
+    }
 
-    //check that format is a supported format,
-    //any format that we want to use is going
-    //to be converted from the driver's native type
-    //record the format somehow so we know what format to use for readStream
-    //probably want to support CF32 for complex floats
-    //and CS16 for complex shorts
-    if (format == "CF32") {
+    //check the format
+    if (format == "CF32")
+    {
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CF32.");
-        convertFloat = true;
-    } else if (format == "CS16") {
+        rxFloat = true;
+    }
+    else if (format == "CS16")
+    {
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CS16.");
-        convertFloat = false;
-    } else {
-        SoapySDR_log(SOAPY_SDR_FATAL, "Only CS16 and CF32 are supported by SoapySDRPlay, and CS16 is the native format.");
-        convertFloat = false;
-        return NULL;
+        rxFloat = false;
+    }
+    else
+    {
+        throw std::runtime_error("setupStream invalid format '" + format + "' -- Only CS16 and CF32 are supported by SoapySDRPlay, and CS16 is the native format.");
     }
 
     //use args to specify optional things like:
@@ -57,12 +59,12 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
     xq.erase(xi.begin(), xi.end());
 }
 
-//size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
-//{
-//    //how large is a transfer?
-//    //this value helps users to allocate buffers that will match the hardware transfer size
-//    return 16384*6;
-//}
+size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
+{
+    //how large is a transfer?
+    //this value helps users to allocate buffers that will match the hardware transfer size
+    return xi.size();
+}
 
 int SoapySDRPlay::activateStream(
     SoapySDR::Stream *stream,
@@ -81,10 +83,9 @@ int SoapySDRPlay::activateStream(
     mir_sdr_ErrT err;
     err = mir_sdr_SetDcMode(4,0);
     err = mir_sdr_SetDcTrackTime(63);
-    err = mir_sdr_Init(newGr, rate, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+    err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
 
-    std::string logMsg("stream sps: " + std::to_string(sps));
-    SoapySDR_log(SOAPY_SDR_DEBUG, logMsg.c_str());
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "stream sps: %d", sps);
 
     // Alocate data buffers
     xi.resize(sps);
@@ -143,7 +144,7 @@ int SoapySDRPlay::readStream(
     int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
 
     //step 3 convert into user's buff0
-    if (convertFloat) {
+    if (rxFloat) {
         float *ftarget = (float *)buff0;
         for (int i = 0; i < returnedElems; i++) {
             ftarget[i*2] = ((float)xi_buffer[i]/(float)SHRT_MAX);
