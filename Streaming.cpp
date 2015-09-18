@@ -13,8 +13,7 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     const SoapySDR::Kwargs &args)
 {
     //check that direction is SOAPY_SDR_RX
-    if (direction == SOAPY_SDR_RX) {
-    } else {
+    if (direction != SOAPY_SDR_RX) {
         return NULL;
     }
 
@@ -27,10 +26,10 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     //record the format somehow so we know what format to use for readStream
     //probably want to support CF32 for complex floats
     //and CS16 for complex shorts
-    if (args.at("format") == "CF32") {
+    if (format == "CF32") {
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CF32.");
         convertFloat = true;
-    } else if (args.at("format") == "CS16") {
+    } else if (format == "CS16") {
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CS16.");
         convertFloat = false;
     } else {
@@ -58,11 +57,12 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
     xq.erase(xi.begin(), xi.end());
 }
 
-size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
-{
-    //how large is a transfer?
-    //this value helps users to allocate buffers that will match the hardware transfer size
-}
+//size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
+//{
+//    //how large is a transfer?
+//    //this value helps users to allocate buffers that will match the hardware transfer size
+//    return 16384*6;
+//}
 
 int SoapySDRPlay::activateStream(
     SoapySDR::Stream *stream,
@@ -81,12 +81,17 @@ int SoapySDRPlay::activateStream(
     mir_sdr_ErrT err;
     err = mir_sdr_SetDcMode(4,0);
     err = mir_sdr_SetDcTrackTime(63);
-    err = mir_sdr_Init(newGr, rate, centerFreq, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+    err = mir_sdr_Init(newGr, rate, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+
+    std::string logMsg("stream sps: " + std::to_string(sps));
+    SoapySDR_log(SOAPY_SDR_DEBUG, logMsg.c_str());
 
     // Alocate data buffers
     xi.resize(sps);
     xq.resize(sps);
     syncUpdate = 0;
+
+    return 0;
 }
 
 int SoapySDRPlay::deactivateStream(
@@ -98,6 +103,8 @@ int SoapySDRPlay::deactivateStream(
     //but disable streaming in the hardware
     mir_sdr_ErrT err;
     err = mir_sdr_Uninit();
+
+    return 0;
 }
 
 int SoapySDRPlay::readStream(
@@ -129,26 +136,29 @@ int SoapySDRPlay::readStream(
         //was numElems < than the hardware transfer size?
         //may have to keep part of that temporary buffer
         //around for the next call into readStream...
-        xi_buffer.insert(xi_buffer.end(),xi.begin(),xi.begin()+sps);
-        xq_buffer.insert(xq_buffer.end(),xq.begin(),xq.begin()+sps);
+        xi_buffer.insert(xi_buffer.end(),xi.begin(),xi.end());
+        xq_buffer.insert(xq_buffer.end(),xq.begin(),xq.end());
     }
 
     int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
 
     //step 3 convert into user's buff0
     if (convertFloat) {
+        float *ftarget = (float *)buff0;
         for (int i = 0; i < returnedElems; i++) {
-            ((float *)buff0)[i*2] = ((float)xi_buffer[i]/(float)SHRT_MAX);
-            ((float *)buff0)[i*2+1] = ((float)xq_buffer[i]/(float)SHRT_MAX);
+            ftarget[i*2] = ((float)xi_buffer[i]/(float)SHRT_MAX);
+            ftarget[i*2+1] = ((float)xq_buffer[i]/(float)SHRT_MAX);
         }
     } else {
+        short *starget = (short *)buff0;
         for (int i = 0; i < returnedElems; i++) {
-            ((short *)buff0)[i*2] = xi_buffer[i];
-            ((short *)buff0)[i*2+1] = xq_buffer[i];
+            starget[i*2] = xi_buffer[i];
+            starget[i*2+1] = xq_buffer[i];
         }
     }
+
     xi_buffer.erase(xi_buffer.begin(),xi_buffer.begin()+returnedElems);
-    xi_buffer.erase(xq_buffer.begin(),xq_buffer.begin()+returnedElems);
+    xq_buffer.erase(xq_buffer.begin(),xq_buffer.begin()+returnedElems);
 
     //return number of elements written to buff0
     return returnedElems;
