@@ -143,6 +143,10 @@ int SoapySDRPlay::readStream(
 
     int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
 
+    if (!returnedElems) {
+        return SOAPY_SDR_UNDERFLOW;
+    }
+
     //step 3 convert into user's buff0
     if (rxFloat) {
         float *ftarget = (float *)buff0;
