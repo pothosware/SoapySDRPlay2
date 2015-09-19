@@ -20,20 +20,28 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
     dcOffsetMode = false;
 
-    // Initialise API and hardware for DAB demodulation: initial gain reduction of 40dB, sample
-    // rate of 2.048MHz, centre frequency of 222.064MHz, double sided bandwidth of 1.536MHz and
-    // a zero-IF
-    // used for DAB type signals
     newGr = 40;
     oldGr = 40;
     grChangedAfter = 0;
     centerFreq = 100000000;
     rate = 2048000;
-    bw = 15360000;
+    bw = getBwValueFromEnum(getBwEnumForRate(rate));
     centerFreqChanged = false;
     rateChanged = false;
     syncUpdate = 0;
     numPackets = DEFAULT_NUM_PACKETS;
+    bwChanged = false;
+
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 200000: %f", getBwValueFromEnum(getBwEnumForRate(200000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 500000: %f", getBwValueFromEnum(getBwEnumForRate(500000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 1024000: %f", getBwValueFromEnum(getBwEnumForRate(1024000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 2048000: %f", getBwValueFromEnum(getBwEnumForRate(2048000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 4096000: %f", getBwValueFromEnum(getBwEnumForRate(4096000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 8192000: %f", getBwValueFromEnum(getBwEnumForRate(8192000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 10000000: %f", getBwValueFromEnum(getBwEnumForRate(10000000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 12000000: %f", getBwValueFromEnum(getBwEnumForRate(12000000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 13000000: %f", getBwValueFromEnum(getBwEnumForRate(13000000)));
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 14000000: %f", getBwValueFromEnum(getBwEnumForRate(14000000)));
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
@@ -264,15 +272,24 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
     return rates;
 }
 
-void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const double bw)
+void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const double bw_in)
 {
-    SoapySDR_log(SOAPY_SDR_DEBUG,"Set bandwidth");
-    this->bw = bw;
+    if (direction == SOAPY_SDR_RX) {
+        newBw = bw_in;
+        bwChanged = true;
+    }
 }
 
 double SoapySDRPlay::getBandwidth(const int direction, const size_t channel) const
 {
-    return bw;
+    if (direction == SOAPY_SDR_RX) {
+        if (bwChanged) {
+            return newBw;
+        }
+        return bw;
+    }
+
+    return 0;
 }
 
 std::vector<double> SoapySDRPlay::listBandwidths(const int direction, const size_t channel) const
@@ -290,16 +307,43 @@ std::vector<double> SoapySDRPlay::listBandwidths(const int direction, const size
 }
 
 
+mir_sdr_Bw_MHzT SoapySDRPlay::getBwEnumForRate(double rate)
+{
+    if (rate <= (200000*2)) return mir_sdr_BW_0_200;
+    else if ((rate >= 200000*2) && rate <= (300000*2)) return mir_sdr_BW_0_300;
+    else if ((rate >= 300000*2) && rate <= (600000*2)) return mir_sdr_BW_0_600;
+    else if ((rate >= 600000*2) && rate <= (1536000*2)) return mir_sdr_BW_1_536;
+    else if ((rate >= 1536000*2) && rate <= (5000000*2)) return mir_sdr_BW_5_000;
+    else if ((rate >= 5000000*2) && rate <= (6000000*2)) return mir_sdr_BW_6_000;
+    else if ((rate >= 6000000*2) && rate <= (7000000*2)) return mir_sdr_BW_7_000;
+    else return mir_sdr_BW_8_000;
+}
 
-mir_sdr_Bw_MHzT SoapySDRPlay::mirGetBwMhzEnum(double bw) {
+
+double SoapySDRPlay::getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum)
+{
+    if (bwEnum == mir_sdr_BW_0_200) return 200000;
+    else if (bwEnum == mir_sdr_BW_0_300) return 300000;
+    else if (bwEnum == mir_sdr_BW_0_600) return 600000;
+    else if (bwEnum == mir_sdr_BW_1_536) return 1536000;
+    else if (bwEnum == mir_sdr_BW_5_000) return 5000000;
+    else if (bwEnum == mir_sdr_BW_6_000) return 6000000;
+    else if (bwEnum == mir_sdr_BW_7_000) return 7000000;
+    else if (bwEnum == mir_sdr_BW_8_000) return 8000000;
+    else return 0;
+}
+
+
+mir_sdr_Bw_MHzT SoapySDRPlay::mirGetBwMhzEnum(double bw)
+{
     if (bw == 200000) return mir_sdr_BW_0_200;
-    if (bw == 300000) return mir_sdr_BW_0_300;
-    if (bw == 600000) return mir_sdr_BW_0_600;
-    if (bw == 1536000) return mir_sdr_BW_1_536;
-    if (bw == 5000000) return mir_sdr_BW_1_536;
-    if (bw == 6000000) return mir_sdr_BW_6_000;
-    if (bw == 7000000) return mir_sdr_BW_7_000;
-    if (bw == 8000000) return mir_sdr_BW_8_000;
+    else if (bw == 300000) return mir_sdr_BW_0_300;
+    else if (bw == 600000) return mir_sdr_BW_0_600;
+    else if (bw == 1536000) return mir_sdr_BW_1_536;
+    else if (bw == 5000000) return mir_sdr_BW_1_536;
+    else if (bw == 6000000) return mir_sdr_BW_6_000;
+    else if (bw == 7000000) return mir_sdr_BW_7_000;
+    else if (bw == 8000000) return mir_sdr_BW_8_000;
 
-    return mir_sdr_BW_1_536;
+    return getBwEnumForRate(bw*2.0);
 }

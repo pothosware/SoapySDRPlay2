@@ -40,14 +40,15 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
         throw std::runtime_error("setupStream invalid format '" + format + "' -- Only CS16 and CF32 are supported by SoapySDRPlay, and CS16 is the native format.");
     }
 
-    if (args.find("buffer_packets") != args.end()) {
-        numPackets = std::stoi(args.at("buffer_packets"));
-        if (std::isnan(numPackets) || numPackets == 0) {
-            numPackets = DEFAULT_NUM_PACKETS;
-            SoapySDR_logf(SOAPY_SDR_DEBUG, "numPackets is 0 or not a number; defaulting to %d", numPackets);
-        }
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
-    }
+//    if (args.find("buffer_packets") != args.end()) {
+//        int numPackets_in = std::stoi(args.at("buffer_packets"));
+//        if (std::isnan(numPackets_in) || numPackets_in == 0) {
+//            SoapySDR_logf(SOAPY_SDR_DEBUG, "numPackets is 0 or not a number; defaulting to %d", numPackets);
+//        } else {
+//            numPackets = numPackets_in;
+//        }
+//    }
+//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
 
     //use args to specify optional things like:
     //integer to float scale factors
@@ -56,9 +57,6 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
 
     //TODO: add optional SDRPlay stream flags here
 
-    //this device probably only supports one stream
-    //so the stream pointer probably doesn't matter
-    //return (SoapySDR::Stream *)42;
     return (SoapySDR::Stream *)this;
 }
 
@@ -96,6 +94,18 @@ int SoapySDRPlay::activateStream(
     if (rateChanged) {
         rate = newRate;
         rateChanged = false;
+
+        mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
+        double bwCheckVal = getBwValueFromEnum(bwCheck);
+        if (bwCheckVal != bw) {
+            bw = bwCheckVal;
+            bwChanged = false;
+            SoapySDR_logf(SOAPY_SDR_DEBUG, "Changed bandwidth for rate %f to %f", rate, bw);
+        }
+    } else if (bwChanged) {
+        mir_sdr_Bw_MHzT eBw = getBwEnumForRate(newBw*2);
+        bw = getBwValueFromEnum(eBw);
+        bwChanged = false;
     }
 
     // Configure DC tracking in tuner
@@ -108,10 +118,14 @@ int SoapySDRPlay::activateStream(
         throw std::runtime_error("activateStream failed.");
     }
 
+    numPackets = getOptimalPacketsForRate(rate, sps);
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
+
     SoapySDR_logf(SOAPY_SDR_DEBUG, "stream sps: %d", sps);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "stream numPackets*sps: %d", (numPackets*sps));
 
-        // Alocate data buffers
+
+    // Alocate data buffers
     xi.resize(sps * numPackets);
     xq.resize(sps * numPackets);
     syncUpdate = 0;
@@ -154,8 +168,16 @@ int SoapySDRPlay::readStream(
         rateChanged = false;
         mir_sdr_SetFs(rate, 1, 0, 1);
         // prevent mixing rates in the same buffer..
+        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed sample rate");
         xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
         xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
+
+        mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
+        double bwCheckVal = getBwValueFromEnum(bwCheck);
+        if (bwCheckVal != bw) {
+            bwChanged = true;
+            newBw = bwCheckVal;
+        }
     }
 
     if (centerFreqChanged)
@@ -167,6 +189,31 @@ int SoapySDRPlay::readStream(
         // prevent center mixing center freq in the same buffer..
         xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
         xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
+    }
+
+    if (bwChanged) {
+        bw = newBw;
+        bwChanged = false;
+
+        // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
+        SoapySDR_log(SOAPY_SDR_DEBUG,"Bandwidth crossed boundary and needed adjustment; resetting device..");
+        err = mir_sdr_Uninit();
+        err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+
+        numPackets = getOptimalPacketsForRate(rate, sps);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init sps: %d", sps);
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init numPackets*sps: %d", (numPackets*sps));
+
+        xi.resize(sps * numPackets);
+        xq.resize(sps * numPackets);
+
+        xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
+        xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
+
+        if (err != 0) {
+            throw std::runtime_error("Error resetting mir_sdr interface for bandwidth change.");
+        }
+
     }
 
     // Prevent stalling if we've already buffered enough data..
@@ -235,4 +282,6 @@ int SoapySDRPlay::readStream(
     return returnedElems;
 }
 
-
+int SoapySDRPlay::getOptimalPacketsForRate(double rate_in, int sps_in) {
+    return ceil((rate_in / 30.0)/(float)sps_in);
+}

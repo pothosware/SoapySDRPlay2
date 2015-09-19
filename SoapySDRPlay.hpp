@@ -14,7 +14,7 @@
     #include <mirsdrapi-rsp.h>
 #endif
 
-#define DEFAULT_NUM_PACKETS 45
+#define DEFAULT_NUM_PACKETS 200
 
 class SoapySDRPlay : public SoapySDR::Device
 {
@@ -147,6 +147,9 @@ public:
 private:
 
     static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
+    static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
+    static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
+    static int getOptimalPacketsForRate(double rate, int sps);
 
     //device handle
 
@@ -171,7 +174,7 @@ private:
     int numPackets;
     double centerFreq, newCenterFreq;
     double rate, newRate;
-    double bw;
+    double bw, newBw;
 
-    bool rxFloat, centerFreqChanged, rateChanged;
+    bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
 };
