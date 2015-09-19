@@ -14,6 +14,8 @@
     #include <mirsdrapi-rsp.h>
 #endif
 
+#define DEFAULT_NUM_PACKETS 45
+
 class SoapySDRPlay : public SoapySDR::Device
 {
 public:
@@ -166,9 +168,10 @@ private:
     int grChangedAfter;
     int newGr;
     int oldGr;
-    double centerFreq;
-    double rate;
+    int numPackets;
+    double centerFreq, newCenterFreq;
+    double rate, newRate;
     double bw;
 
-    bool rxFloat;
+    bool rxFloat, centerFreqChanged, rateChanged;
 };

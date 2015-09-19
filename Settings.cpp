@@ -30,7 +30,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     centerFreq = 100000000;
     rate = 2048000;
     bw = 15360000;
+    centerFreqChanged = false;
+    rateChanged = false;
     syncUpdate = 0;
+    numPackets = DEFAULT_NUM_PACKETS;
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
@@ -193,9 +196,8 @@ void SoapySDRPlay::setFrequency(const int direction, const size_t channel, const
 {
     if (name == "RF")
     {
-        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed center frequency");
-        centerFreq = frequency;
-        mir_sdr_SetRf(centerFreq, 1, 0);
+        newCenterFreq = frequency;
+        centerFreqChanged = true;
     }
 }
 
@@ -203,6 +205,9 @@ double SoapySDRPlay::getFrequency(const int direction, const size_t channel, con
 {
     if (name == "RF")
     {
+        if (centerFreqChanged) {
+            return newCenterFreq;
+        }
         return centerFreq;
     }
 
@@ -230,16 +235,23 @@ SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const s
  * Sample Rate API
  ******************************************************************/
 
-void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate)
+void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate_in)
 {
-    SoapySDR_log(SOAPY_SDR_DEBUG,"Set sample rate");
-    this->rate = rate;
-    mir_sdr_SetFs(rate, 1, 0, 0);
+    newRate = rate_in;
+    rateChanged = true;
 }
 
 double SoapySDRPlay::getSampleRate(const int direction, const size_t channel) const
 {
-    return this->rate;
+    if (direction == SOAPY_SDR_RX) {
+        if (rateChanged) {
+            return newRate;
+        }
+
+        return rate;
+    }
+
+    return 0;
 }
 
 std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const size_t channel) const
