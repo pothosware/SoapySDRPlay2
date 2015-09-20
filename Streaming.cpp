@@ -14,7 +14,7 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
 {
     //check that direction is SOAPY_SDR_RX
     if (direction != SOAPY_SDR_RX) {
-        return NULL;
+        throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
     }
 
     //check the channel configuration
@@ -159,7 +159,7 @@ int SoapySDRPlay::readStream(
     //this is the user's buffer for channel 0
     void *buff0 = buffs[0];
 
-    //step 1 check for data with timeout
+    //check for data with timeout
     // TODO: Can we do?
 
     if (rateChanged)
@@ -174,10 +174,11 @@ int SoapySDRPlay::readStream(
 
         mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
         double bwCheckVal = getBwValueFromEnum(bwCheck);
-        if (bwCheckVal != bw) {
+        // Always update, can only handle 1000ppm shifts while online
+        // if (bwCheckVal != bw) {
             bwChanged = true;
             newBw = bwCheckVal;
-        }
+        // }
     }
 
     if (centerFreqChanged)
@@ -196,7 +197,7 @@ int SoapySDRPlay::readStream(
         bwChanged = false;
 
         // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
-        SoapySDR_log(SOAPY_SDR_DEBUG,"Bandwidth crossed boundary and needed adjustment; resetting device..");
+//        SoapySDR_log(SOAPY_SDR_DEBUG,"Bandwidth crossed boundary and needed adjustment; resetting device..");
         err = mir_sdr_Uninit();
         err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
 
@@ -219,7 +220,11 @@ int SoapySDRPlay::readStream(
     // Prevent stalling if we've already buffered enough data..
     if (xi_buffer.size() < numElems)
     {
-        //step 2 receive into temporary buffer
+        // If we change frequency or bandwidth mid-stream then drop the unmatched samples
+        // by setting the startPacket offset
+        int startPacket = 0;
+
+        //receive into temporary buffer
         for (int i = 0; i < numPackets; i++)
         {
             err = mir_sdr_ReadPacket(&xi[sps*i], &xq[sps*i], &fs, &grc, &rfc, &fsc);
@@ -235,18 +240,22 @@ int SoapySDRPlay::readStream(
             if (rfc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Center frequency change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,1,0);
+                startPacket = i;
             }
-            if (fsc) {
+            if (fsc) {  // This shouldn't happen now but leaving it to see..
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Rate change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,0,1);
+                startPacket = i;
             }
         }
 
         //was numElems < than the hardware transfer size?
         //may have to keep part of that temporary buffer
         //around for the next call into readStream...
-        xi_buffer.insert(xi_buffer.end(),xi.begin(),xi.end());
-        xq_buffer.insert(xq_buffer.end(),xq.begin(),xq.end());
+        if (startPacket < numPackets) {
+            xi_buffer.insert(xi_buffer.end(),xi.begin()+(sps*startPacket),xi.end());
+            xq_buffer.insert(xq_buffer.end(),xq.begin()+(sps*startPacket),xq.end());
+        }
     }
 
     int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
@@ -255,7 +264,7 @@ int SoapySDRPlay::readStream(
         return SOAPY_SDR_UNDERFLOW;
     }
 
-    //step 3 convert into user's buff0
+    //convert into user's buff0
     if (rxFloat)
     {
         float *ftarget = (float *)buff0;

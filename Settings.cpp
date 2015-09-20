@@ -266,8 +266,8 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> rates;
 
-    rates.push_back(200000);
-    rates.push_back(8000000);
+    rates.push_back(2000000);
+    rates.push_back(12000000);
     
     return rates;
 }

@@ -10,7 +10,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
     std::vector<SoapySDR::Kwargs> results;
 
-    //TODO enumerate devices, each device gets an entry in the results
+    //enumerate devices, each device gets an entry in the results
     //results should contain identifying information about each device
     //like a serial number or some kind of identification number.
 
