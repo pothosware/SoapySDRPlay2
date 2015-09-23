@@ -162,42 +162,47 @@ int SoapySDRPlay::readStream(
     //check for data with timeout
     // TODO: Can we do?
 
+    bool reInit = false;
+
     if (rateChanged)
     {
         rate = newRate;
         rateChanged = false;
-        mir_sdr_SetFs(rate, 1, 0, 1);
-        // prevent mixing rates in the same buffer..
-        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed sample rate");
-        xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
-        xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
 
         mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
         double bwCheckVal = getBwValueFromEnum(bwCheck);
-        // Always update, can only handle 1000ppm shifts while online
-        // if (bwCheckVal != bw) {
-            bwChanged = true;
-            newBw = bwCheckVal;
-        // }
+
+        bwChanged = true;
+        newBw = bwCheckVal;
+
+        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed sample rate");
     }
 
     if (centerFreqChanged)
     {
+        double freqDiff = std::abs(centerFreq-newCenterFreq);
         centerFreq = newCenterFreq;
         centerFreqChanged = false;
-        mir_sdr_SetRf(centerFreq, 1, 0);
+
+        if (freqDiff < rate/2.0) {
+            mir_sdr_SetRf(centerFreq, 1, 0);
+        } else {
+            reInit = true;
+        }
+
         SoapySDR_log(SOAPY_SDR_DEBUG,"Changed center frequency");
-        // prevent center mixing center freq in the same buffer..
-        xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
-        xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
     }
 
-    if (bwChanged) {
+    if (bwChanged)
+    {
         bw = newBw;
         bwChanged = false;
+        reInit = true;
+    }
 
+    if (reInit)
+    {
         // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
-//        SoapySDR_log(SOAPY_SDR_DEBUG,"Bandwidth crossed boundary and needed adjustment; resetting device..");
         err = mir_sdr_Uninit();
         err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
 
