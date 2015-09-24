@@ -169,7 +169,7 @@ private:
     int sps;
     int grc, rfc, fsc;
     int grChangedAfter;
-    int newGr;
+    int gr, newGr, adcLow, adcHigh, adcTarget;
     int oldGr;
     int numPackets;
     double centerFreq, newCenterFreq;

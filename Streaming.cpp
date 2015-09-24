@@ -240,6 +240,8 @@ int SoapySDRPlay::readStream(
             }
             if (grc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Gain change acknowledged from device. packet: %d", i);
+                grChangedAfter = (i + 1) * sps; // indicate where change occurred
+                grc = 0;
                 mir_sdr_ResetUpdateFlags(1,0,0);
             }
             if (rfc) {
@@ -251,6 +253,34 @@ int SoapySDRPlay::readStream(
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Rate change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,0,1);
                 startPacket = i;
+            }
+        }
+
+        // AGC
+        if (grChangedAfter > 0) // do AGC if no update pending
+        {
+            double adcPower, ival, qval;
+            for (int j = 0; j < (sps * numPackets); j++)
+            {
+                ival = xi[j];
+                qval = xq[j];
+                adcPower += (ival*ival) + (qval*qval);
+            }
+            adcPower /= double(sps*numPackets);
+
+            if ((adcPower > double(adcHigh)) || (adcPower < double(adcLow))) {
+                newGr = int(10.0 * log(adcPower / adcTarget));
+                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
+            }
+
+            // reset flag in case no change is required
+            grChangedAfter = 0;
+            // only update if change is required
+            if (newGr != oldGr) {
+                // use absolute value
+                err = mir_sdr_SetGr(newGr, 1, syncUpdate);
+                grChangedAfter = -1;
+                oldGr = newGr;
             }
         }
 
