@@ -5,7 +5,16 @@
 
 #pragma once
 
+#include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
+
+#if __APPLE__
+    #include <mir_sdr.h>
+#else
+    #include <mirsdrapi-rsp.h>
+#endif
+
+#define DEFAULT_NUM_PACKETS 200
 
 class SoapySDRPlay : public SoapySDR::Device
 {
@@ -69,7 +78,7 @@ public:
 
     std::vector<std::string> listAntennas(const int direction, const size_t channel) const;
 
-    void setAntenna(const int direction, const size_t channel, const std::string &name);
+//    void setAntenna(const int direction, const size_t channel, const std::string &name);
 
     std::string getAntenna(const int direction, const size_t channel) const;
 
@@ -87,25 +96,25 @@ public:
 
     void setDCOffset(const int direction, const size_t channel, const std::complex<double> &offset);
 
-    std::complex<double> getDCOffset(const int direction, const size_t channel) const;
+//    std::complex<double> getDCOffset(const int direction, const size_t channel) const;
 
     /*******************************************************************
      * Gain API
      ******************************************************************/
 
-    std::vector<std::string> listGains(const int direction, const size_t channel) const;
-
-    void setGainMode(const int direction, const size_t channel, const bool automatic);
-
-    bool getGainMode(const int direction, const size_t channel) const;
-
-    void setGain(const int direction, const size_t channel, const double value);
-
-    void setGain(const int direction, const size_t channel, const std::string &name, const double value);
-
-    double getGain(const int direction, const size_t channel, const std::string &name) const;
-
-    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
+//    std::vector<std::string> listGains(const int direction, const size_t channel) const;
+//
+//    void setGainMode(const int direction, const size_t channel, const bool automatic);
+//
+//    bool getGainMode(const int direction, const size_t channel) const;
+//
+//    void setGain(const int direction, const size_t channel, const double value);
+//
+//    void setGain(const int direction, const size_t channel, const std::string &name, const double value);
+//
+//    double getGain(const int direction, const size_t channel, const std::string &name) const;
+//
+//    SoapySDR::Range getGainRange(const int direction, const size_t channel, const std::string &name) const;
 
     /*******************************************************************
      * Frequency API
@@ -137,9 +146,35 @@ public:
 
 private:
 
-    //TODO
+    static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
+    static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
+    static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
+    static int getOptimalPacketsForRate(double rate, int sps);
 
-    //device handle...
+    //device handle
 
-    //cached settings...
+    //stream
+//    short *xi;
+//    short *xq;
+    std::vector<short> xi;
+    std::vector<short> xi_buffer;
+    std::vector<short> xq;
+    std::vector<short> xq_buffer;
+    unsigned int fs;
+    int syncUpdate;
+
+    //cached settings
+    float ver;
+    bool dcOffsetMode;
+    int sps;
+    int grc, rfc, fsc;
+    int grChangedAfter;
+    int gr, newGr, adcLow, adcHigh, adcTarget;
+    int oldGr;
+    int numPackets;
+    double centerFreq, newCenterFreq;
+    double rate, newRate;
+    double bw, newBw;
+
+    bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
 };

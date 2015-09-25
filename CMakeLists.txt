@@ -24,6 +24,7 @@ include_directories(${LIBSDRPLAY_INCLUDE_DIRS})
 SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
+        SoapySDRPlay.hpp
         Registation.cpp
         Settings.cpp
         Streaming.cpp

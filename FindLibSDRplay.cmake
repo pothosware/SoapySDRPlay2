@@ -1,19 +1,27 @@
 if(NOT LIBSDRPLAY_FOUND)
-  find_package(PkgConfig)
-  pkg_check_modules (LIBSDRPLAY_PKG libsdrplay)
-  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES mirsdrapi-rsp.h
+  # pkg_check_modules (LIBSDRPLAY_PKG libsdrplay)
+
+  if(APPLE)
+    SET(LIBSDRPLAY_HEADER_NAME mir_sdr.h)
+    SET(LIBSDRPLAY_LIB_NAME mir_sdr)
+  else()
+    SET(LIBSDRPLAY_HEADER_NAME, mirsdrapi-rsp.h)
+    SET(LIBSDRPLAY_LIB_NAME, mirsdrapi-rsp)
+  endif()
+
+  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES "${LIBSDRPLAY_HEADER_NAME}"
     PATHS
-    ${LIBSDRPLAY_PKG_INCLUDE_DIRS}
     /usr/include
     /usr/local/include
   )
+  # ${LIBSDRPLAY_PKG_INCLUDE_DIRS}
 
-  find_library(LIBSDRPLAY_LIBRARIES NAMES mirsdrapi-rsp
+  find_library(LIBSDRPLAY_LIBRARIES NAMES "${LIBSDRPLAY_LIB_NAME}"
     PATHS
-    ${LIBSDRPLAY_PKG_LIBRARY_DIRS}
     /usr/lib
     /usr/local/lib
   )
+  # ${LIBSDRPLAY_PKG_LIBRARY_DIRS}
 
 if(LIBSDRPLAY_INCLUDE_DIRS AND LIBSDRPLAY_LIBRARIES)
   set(LIBSDRPLAY_FOUND TRUE CACHE INTERNAL "libsdrplay found")
