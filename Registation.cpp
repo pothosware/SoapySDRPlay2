@@ -45,7 +45,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
         SoapySDR::Kwargs dev;
 
         dev["driver"] = "mir_sdr";
-        dev["label"] = "SDRPlay Device (experimental)";
+        dev["label"] = "SDRPlay RSP";
 
         results.push_back(dev);
     }
