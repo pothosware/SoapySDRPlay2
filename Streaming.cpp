@@ -122,7 +122,7 @@ int SoapySDRPlay::activateStream(
             SoapySDR_logf(SOAPY_SDR_DEBUG, "Changed bandwidth for rate %f to %f", rate, bw);
         }
     } else if (bwChanged) {
-        mir_sdr_Bw_MHzT eBw = getBwEnumForRate(newBw*2);
+        mir_sdr_Bw_MHzT eBw = getBwEnumForRate(newBw);
         bw = getBwValueFromEnum(eBw);
         bwChanged = false;
     }
