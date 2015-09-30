@@ -45,7 +45,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     adcLow = int(exp(double(gr-2)*log(10.0)));
     adcTarget = int(exp(double(gr)*log(10.0)));
     adcHigh = int(exp(double(gr+2)*log(10.0)));
-    grChangedAfter = 0;
     centerFreq = 100000000;
     rate = 2048000;
     bw = getBwValueFromEnum(getBwEnumForRate(rate));
