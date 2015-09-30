@@ -59,7 +59,8 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
         throw std::runtime_error("setupStream invalid format '" + format + "' -- Only CS16 and CF32 are supported by SoapySDRPlay, and CS16 is the native format.");
     }
 
-//    if (args.find("buffer_packets") != args.end()) {
+
+//    if (args.count("buffer_packets") != 0) {
 //        int numPackets_in = std::stoi(args.at("buffer_packets"));
 //        if (std::isnan(numPackets_in) || numPackets_in == 0) {
 //            SoapySDR_logf(SOAPY_SDR_DEBUG, "numPackets is 0 or not a number; defaulting to %d", numPackets);
@@ -69,27 +70,23 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
 //    }
 //    SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
 
-    //use args to specify optional things like:
-    //integer to float scale factors
-    //number of transfers and or transfer size
-    //depends what the hardware supports...
-
     //TODO: add optional SDRPlay stream flags here
+
+    bufferedElems = 0;
+    bufferedElemOffset = 0;
+    resetBuffer = false;
 
     return (SoapySDR::Stream *)this;
 }
 
 void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
 {
-    xi.erase(xi.begin(), xi.end());
-    xq.erase(xi.begin(), xi.end());
+
 }
 
 size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
 {
-    //how large is a transfer?
-    //this value helps users to allocate buffers that will match the hardware transfer size
-    return xi.size();
+    return xi_buffer.size();
 }
 
 int SoapySDRPlay::activateStream(
@@ -145,8 +142,8 @@ int SoapySDRPlay::activateStream(
 
 
     // Alocate data buffers
-    xi.resize(sps * numPackets);
-    xq.resize(sps * numPackets);
+    xi_buffer.resize(sps * numPackets);
+    xq_buffer.resize(sps * numPackets);
     syncUpdate = 0;
 
     return 0;
@@ -182,6 +179,12 @@ int SoapySDRPlay::readStream(
     // TODO: Can we do?
 
     bool reInit = false;
+
+    if (resetBuffer)
+    {
+        resetBuffer = false;
+        bufferedElems = 0;
+    }
 
     if (rateChanged)
     {
@@ -229,29 +232,30 @@ int SoapySDRPlay::readStream(
         SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init sps: %d", sps);
         SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init numPackets*sps: %d", (numPackets*sps));
 
-        xi.resize(sps * numPackets);
-        xq.resize(sps * numPackets);
-
-        xi_buffer.erase(xi_buffer.begin(), xi_buffer.end());
-        xq_buffer.erase(xq_buffer.begin(), xq_buffer.end());
+        xi_buffer.resize(sps * numPackets);
+        xq_buffer.resize(sps * numPackets);
 
         if (err != 0) {
             throw std::runtime_error("Error resetting mir_sdr interface for bandwidth change.");
         }
 
+        bufferedElems = 0;
+        bufferedElemOffset = 0;
+        resetBuffer = false;
     }
 
-    // Prevent stalling if we've already buffered enough data..
-    if (xi_buffer.size() < numElems)
+
+    //are elements left in the buffer? if not, do a new read.
+    if (bufferedElems == 0)
     {
-        // If we change frequency or bandwidth mid-stream then drop the unmatched samples
-        // by setting the startPacket offset
-        int startPacket = 0;
+        bool grChanged = false;
+
+        bufferedElemOffset = 0;
 
         //receive into temporary buffer
         for (int i = 0; i < numPackets; i++)
         {
-            err = mir_sdr_ReadPacket(&xi[sps*i], &xq[sps*i], &fs, &grc, &rfc, &fsc);
+            err = mir_sdr_ReadPacket(&xi_buffer[sps*i], &xq_buffer[sps*i], &fs, &grc, &rfc, &fsc);
             //return SOAPY_SDR_TIMEOUT when timeout occurs
             if (err != 0)
             {
@@ -259,64 +263,52 @@ int SoapySDRPlay::readStream(
             }
             if (grc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Gain change acknowledged from device. packet: %d", i);
-                grChangedAfter = (i + 1) * sps; // indicate where change occurred
+                grChanged = true; // indicate where change occurred
                 grc = 0;
                 mir_sdr_ResetUpdateFlags(1,0,0);
             }
             if (rfc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Center frequency change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,1,0);
-                startPacket = i;
+                bufferedElemOffset = i * sps;
             }
             if (fsc) {  // This shouldn't happen now but leaving it to see..
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Rate change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,0,1);
-                startPacket = i;
+                bufferedElemOffset = i * sps;
             }
         }
 
+        bufferedElems = (numPackets*sps) - bufferedElemOffset;
+
         // AGC
-        if (grChangedAfter > 0) // do AGC if no update pending
+        if (grChanged) // do AGC if no update pending
         {
             double adcPower, ival, qval;
-            for (int j = 0; j < (sps * numPackets); j++)
+            for (int j = 0; j < bufferedElems; j++)
             {
-                ival = xi[j];
-                qval = xq[j];
+                ival = xi_buffer[j];
+                qval = xq_buffer[j];
                 adcPower += (ival*ival) + (qval*qval);
             }
-            adcPower /= double(sps*numPackets);
+            adcPower /= double(bufferedElems);
 
             if ((adcPower > double(adcHigh)) || (adcPower < double(adcLow))) {
                 newGr = int(10.0 * log(adcPower / adcTarget));
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
             }
 
-            // reset flag in case no change is required
-            grChangedAfter = 0;
             // only update if change is required
             if (newGr != oldGr) {
                 // use absolute value
                 err = mir_sdr_SetGr(newGr, 1, syncUpdate);
-                grChangedAfter = -1;
                 oldGr = newGr;
             }
         }
 
-        //was numElems < than the hardware transfer size?
-        //may have to keep part of that temporary buffer
-        //around for the next call into readStream...
-        if (startPacket < numPackets) {
-            xi_buffer.insert(xi_buffer.end(),xi.begin()+(sps*startPacket),xi.end());
-            xq_buffer.insert(xq_buffer.end(),xq.begin()+(sps*startPacket),xq.end());
-        }
     }
 
-    int returnedElems = (numElems>xi_buffer.size())?xi_buffer.size():numElems;
-
-    if (!returnedElems) {
-        return SOAPY_SDR_UNDERFLOW;
-    }
+    int returnedElems = (numElems>bufferedElems)?bufferedElems:numElems;
 
     //convert into user's buff0
     if (rxFloat)
@@ -324,8 +316,8 @@ int SoapySDRPlay::readStream(
         float *ftarget = (float *)buff0;
         for (int i = 0; i < returnedElems; i++)
         {
-            ftarget[i*2] = ((float)xi_buffer[i]/(float)SHRT_MAX);
-            ftarget[i*2+1] = ((float)xq_buffer[i]/(float)SHRT_MAX);
+            ftarget[i*2] = ((float)xi_buffer[bufferedElemOffset+i]/(float)SHRT_MAX);
+            ftarget[i*2+1] = ((float)xq_buffer[bufferedElemOffset+i]/(float)SHRT_MAX);
         }
     }
     else
@@ -333,13 +325,14 @@ int SoapySDRPlay::readStream(
         short *starget = (short *)buff0;
         for (int i = 0; i < returnedElems; i++)
         {
-            starget[i*2] = xi_buffer[i];
-            starget[i*2+1] = xq_buffer[i];
+            starget[i*2] = xi_buffer[bufferedElemOffset+i];
+            starget[i*2+1] = xq_buffer[bufferedElemOffset+i];
         }
     }
 
-    xi_buffer.erase(xi_buffer.begin(),xi_buffer.begin()+returnedElems);
-    xq_buffer.erase(xq_buffer.begin(),xq_buffer.begin()+returnedElems);
+    //bump variables for next call into readStream
+    bufferedElems -= returnedElems;
+    bufferedElemOffset += returnedElems;
 
     //return number of elements written to buff0
     return returnedElems;

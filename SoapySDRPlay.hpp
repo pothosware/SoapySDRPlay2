@@ -173,11 +173,9 @@ private:
     //device handle
 
     //stream
-//    short *xi;
-//    short *xq;
-    std::vector<short> xi;
+    int bufferedElems, bufferedElemOffset;
+    bool resetBuffer;
     std::vector<short> xi_buffer;
-    std::vector<short> xq;
     std::vector<short> xq_buffer;
     unsigned int fs;
     int syncUpdate;
@@ -187,7 +185,6 @@ private:
     bool dcOffsetMode;
     int sps;
     int grc, rfc, fsc;
-    int grChangedAfter;
     int gr, newGr, adcLow, adcHigh, adcTarget;
     int oldGr;
     int numPackets;
