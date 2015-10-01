@@ -75,6 +75,17 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     bufferedElems = 0;
     bufferedElemOffset = 0;
     resetBuffer = false;
+    oldGr = newGr = gr = 40;
+
+    double dbFs = -10.0;
+
+    adcLow = expf((double)(dbFs-2.0)/10.0);
+    adcTarget = expf((double)dbFs/10.0);
+    adcHigh = expf((double)(dbFs+2.0)/10.0);
+
+    grWaiting = 0;
+
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "ADC gain targets min/target/max: %f, %f, %f", adcLow, adcTarget, adcHigh);
 
     return (SoapySDR::Stream *)this;
 }
@@ -242,14 +253,13 @@ int SoapySDRPlay::readStream(
         bufferedElems = 0;
         bufferedElemOffset = 0;
         resetBuffer = false;
+        grChanged = true;
     }
 
 
     //are elements left in the buffer? if not, do a new read.
     if (bufferedElems == 0)
     {
-        bool grChanged = false;
-
         bufferedElemOffset = 0;
 
         //receive into temporary buffer
@@ -282,19 +292,19 @@ int SoapySDRPlay::readStream(
         bufferedElems = (numPackets*sps) - bufferedElemOffset;
 
         // AGC
-        if (grChanged) // do AGC if no update pending
+        if ((grChanged && bufferedElems) || (bufferedElems && (grWaiting > 100))) // do AGC if no update pending
         {
             double adcPower, ival, qval;
             for (int j = 0; j < bufferedElems; j++)
             {
-                ival = xi_buffer[j];
-                qval = xq_buffer[j];
+                ival = (float)xi_buffer[bufferedElemOffset+j]/32767.0;
+                qval = (float)xq_buffer[bufferedElemOffset+j]/32767.0;
                 adcPower += (ival*ival) + (qval*qval);
             }
-            adcPower /= double(bufferedElems);
+            double avgPower = adcPower / double(bufferedElems);
 
-            if ((adcPower > double(adcHigh)) || (adcPower < double(adcLow))) {
-                newGr = int(10.0 * log(adcPower / adcTarget));
+            if ((avgPower >= adcHigh) || (avgPower <= adcLow)) {
+                newGr = 10.0 * log10(adcPower / adcTarget);
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
             }
 
@@ -304,6 +314,10 @@ int SoapySDRPlay::readStream(
                 err = mir_sdr_SetGr(newGr, 1, syncUpdate);
                 oldGr = newGr;
             }
+            grChanged = false;
+            grWaiting = 0;
+        } else {
+            grWaiting++;
         }
 
     }
@@ -316,8 +330,8 @@ int SoapySDRPlay::readStream(
         float *ftarget = (float *)buff0;
         for (int i = 0; i < returnedElems; i++)
         {
-            ftarget[i*2] = ((float)xi_buffer[bufferedElemOffset+i]/(float)SHRT_MAX);
-            ftarget[i*2+1] = ((float)xq_buffer[bufferedElemOffset+i]/(float)SHRT_MAX);
+            ftarget[i*2] = ((float)xi_buffer[bufferedElemOffset+i]/32767.0);
+            ftarget[i*2+1] = ((float)xq_buffer[bufferedElemOffset+i]/32767.0);
         }
     }
     else

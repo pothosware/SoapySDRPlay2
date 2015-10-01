@@ -185,9 +185,11 @@ private:
     bool dcOffsetMode;
     int sps;
     int grc, rfc, fsc;
-    int gr, newGr, adcLow, adcHigh, adcTarget;
-    int oldGr;
+    int gr, newGr;
+    double adcLow, adcHigh, adcTarget;
+    int oldGr, grWaiting;
     int numPackets;
+    bool grChanged;
     double centerFreq, newCenterFreq;
     double rate, newRate;
     double bw, newBw;
