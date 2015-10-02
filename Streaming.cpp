@@ -307,9 +307,10 @@ int SoapySDRPlay::readStream(
 
             if (adcPower && ((avgPower >= adcHigh) || (avgPower <= adcLow))) {
                 newGr = 10.0 * log10(adcPower / adcTarget);
-            } else {
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);
             }
+//            else {
+//                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);
+//            }
 
             // only update if change is required
             if (newGr != oldGr) {
