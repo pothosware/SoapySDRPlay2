@@ -78,12 +78,11 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     oldGr = newGr = gr = 40;
 
     double dbFs = -10.0;
+    double dbFsRange = 5;
 
-    adcLow = expf((double)(dbFs-2.0)/10.0);
+    adcLow = expf((double)(dbFs-dbFsRange)/10.0);
     adcTarget = expf((double)dbFs/10.0);
-    adcHigh = expf((double)(dbFs+2.0)/10.0);
-
-    grWaiting = 0;
+    adcHigh = expf((double)(dbFs+dbFsRange)/10.0);
 
     SoapySDR_logf(SOAPY_SDR_DEBUG, "ADC gain targets min/target/max: %f, %f, %f", adcLow, adcTarget, adcHigh);
 
@@ -253,7 +252,7 @@ int SoapySDRPlay::readStream(
         bufferedElems = 0;
         bufferedElemOffset = 0;
         resetBuffer = false;
-        grChanged = true;
+        grChanged = false;
     }
 
 
@@ -261,6 +260,7 @@ int SoapySDRPlay::readStream(
     if (bufferedElems == 0)
     {
         bufferedElemOffset = 0;
+        int gainElemOfs = 0;
 
         //receive into temporary buffer
         for (int i = 0; i < numPackets; i++)
@@ -273,51 +273,52 @@ int SoapySDRPlay::readStream(
             }
             if (grc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Gain change acknowledged from device. packet: %d", i);
-                grChanged = true; // indicate where change occurred
-                grc = 0;
+                grChanged = false; // indicate where change occurred
                 mir_sdr_ResetUpdateFlags(1,0,0);
+                gainElemOfs = i * sps;
             }
             if (rfc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Center frequency change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,1,0);
                 bufferedElemOffset = i * sps;
+                gainElemOfs = i * sps;
             }
             if (fsc) {  // This shouldn't happen now but leaving it to see..
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Rate change acknowledged from device. packet: %d", i);
                 mir_sdr_ResetUpdateFlags(0,0,1);
                 bufferedElemOffset = i * sps;
+                gainElemOfs = i * sps;
             }
         }
 
         bufferedElems = (numPackets*sps) - bufferedElemOffset;
 
-        // AGC
-        if ((grChanged && bufferedElems) || (bufferedElems && (grWaiting > 100))) // do AGC if no update pending
+        // Run AGC unless AGC is waiting for update
+        if (bufferedElems && !gainElemOfs && !grChanged)
         {
             double adcPower, ival, qval;
             for (int j = 0; j < bufferedElems; j++)
             {
-                ival = (float)xi_buffer[bufferedElemOffset+j]/32767.0;
-                qval = (float)xq_buffer[bufferedElemOffset+j]/32767.0;
+                ival = (float)xi_buffer[j]/32767.0;
+                qval = (float)xq_buffer[j]/32767.0;
                 adcPower += (ival*ival) + (qval*qval);
             }
             double avgPower = adcPower / double(bufferedElems);
 
-            if ((avgPower >= adcHigh) || (avgPower <= adcLow)) {
+            if (adcPower && ((avgPower >= adcHigh) || (avgPower <= adcLow))) {
                 newGr = 10.0 * log10(adcPower / adcTarget);
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
+            } else {
+                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);
             }
 
             // only update if change is required
             if (newGr != oldGr) {
                 // use absolute value
+                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
                 err = mir_sdr_SetGr(newGr, 1, syncUpdate);
                 oldGr = newGr;
+                grChanged = true;
             }
-            grChanged = false;
-            grWaiting = 0;
-        } else {
-            grWaiting++;
         }
 
     }

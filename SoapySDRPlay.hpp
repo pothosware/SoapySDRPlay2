@@ -187,7 +187,7 @@ private:
     int grc, rfc, fsc;
     int gr, newGr;
     double adcLow, adcHigh, adcTarget;
-    int oldGr, grWaiting;
+    int oldGr;
     int numPackets;
     bool grChanged;
     double centerFreq, newCenterFreq;
