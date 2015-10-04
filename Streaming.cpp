@@ -77,6 +77,10 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     resetBuffer = false;
     oldGr = newGr = gr = 40;
 
+    for (int k = 0; k < GR_FILTER_STEPS; k++) {
+        grFilter[k] = gr;
+    }
+
     double dbFs = -10.0;
     double dbFsRange = 5;
 
@@ -305,8 +309,14 @@ int SoapySDRPlay::readStream(
             }
             double avgPower = adcPower / double(bufferedElems);
 
+
             if (adcPower && ((avgPower >= adcHigh) || (avgPower <= adcLow))) {
-                newGr = 10.0 * log10(adcPower / adcTarget);
+                grFilter[0] = 10.0 * log10(adcPower / adcTarget);
+                for (int k = 1; k < GR_FILTER_STEPS; k++) {
+                    grFilter[k] += (grFilter[0] - grFilter[k]) * 0.10;
+                }
+                newGr = grFilter[GR_FILTER_STEPS-1];
+//                newGr = 10.0 * log10(adcPower / adcTarget);
             }
 //            else {
 //                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);

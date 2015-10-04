@@ -34,6 +34,8 @@
 #endif
 
 #define DEFAULT_NUM_PACKETS 200
+#define GR_FILTER_STEPS 5
+
 
 class SoapySDRPlay : public SoapySDR::Device
 {
@@ -187,6 +189,7 @@ private:
     int grc, rfc, fsc;
     int gr, newGr;
     double adcLow, adcHigh, adcTarget;
+    double grFilter[GR_FILTER_STEPS];
     int oldGr;
     int numPackets;
     bool grChanged;
