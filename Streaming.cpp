@@ -88,6 +88,8 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     adcTarget = expf((double)dbFs/10.0);
     adcHigh = expf((double)(dbFs+dbFsRange)/10.0);
 
+    grMisses = 0;
+
     SoapySDR_logf(SOAPY_SDR_DEBUG, "ADC gain targets min/target/max: %f, %f, %f", adcLow, adcTarget, adcHigh);
 
     return (SoapySDR::Stream *)this;
@@ -329,6 +331,14 @@ int SoapySDRPlay::readStream(
                 err = mir_sdr_SetGr(newGr, 1, syncUpdate);
                 oldGr = newGr;
                 grChanged = true;
+            }
+        } else if (grChanged) {
+            grMisses++;
+            if (grMisses >= 10) {
+                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC missed %d updates, giving it a kick.", grMisses);
+                mir_sdr_ResetUpdateFlags(0,1,0);
+                grMisses = 0;
+                grChanged = false;
             }
         }
 

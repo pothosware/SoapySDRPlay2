@@ -190,7 +190,7 @@ private:
     int gr, newGr;
     double adcLow, adcHigh, adcTarget;
     double grFilter[GR_FILTER_STEPS];
-    int oldGr;
+    int oldGr, grMisses;
     int numPackets;
     bool grChanged;
     double centerFreq, newCenterFreq;
