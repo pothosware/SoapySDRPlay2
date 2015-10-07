@@ -134,7 +134,7 @@ int SoapySDRPlay::activateStream(
         gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_144, 375000000, 395000000));
         gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_168, 395000000, 420000000));
         gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 420000000, 1000000000, 40, 7, 85));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 1000000000, 200000000, 40, 5, 85));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 1000000000, 2000000000, 40, 5, 85));
     }
 
     activeGainPref = &gainPrefs[0];
