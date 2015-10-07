@@ -123,6 +123,24 @@ int SoapySDRPlay::activateStream(
         centerFreqChanged = false;
     }
 
+
+    if (SoapySDRPlay::gainPrefs.empty()) {
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 100000, 12000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 12000000, 30000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 30000000, 60000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 60000000, 120000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 120000000, 250000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 250000000, 375000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_144, 375000000, 395000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_168, 395000000, 420000000));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 420000000, 1000000000, 40, 7, 85));
+        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 1000000000, 200000000, 40, 5, 85));
+    }
+
+    activeGainPref = &gainPrefs[0];
+    checkGainPref(centerFreq);
+    gainPrefChanged = false;
+
     if (rateChanged) {
         rate = newRate;
         rateChanged = false;
@@ -142,13 +160,18 @@ int SoapySDRPlay::activateStream(
 
     // Configure DC tracking in tuner
     mir_sdr_ErrT err;
-    err = mir_sdr_SetDcMode(4,0);
-    err = mir_sdr_SetDcTrackTime(63);
+    mir_sdr_SetParam(101, activeGainPref->loFreq);
     err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
 
     if (err != 0) {
         throw std::runtime_error("activateStream failed.");
     }
+
+    if (dcOffsetMode) {
+        mir_sdr_SetDcMode(1, 1);
+    }
+
+    mir_sdr_SetGrParams(0, activeGainPref->grLNA);
 
     numPackets = getOptimalPacketsForRate(rate, sps);
     SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
@@ -157,10 +180,11 @@ int SoapySDRPlay::activateStream(
     SoapySDR_logf(SOAPY_SDR_DEBUG, "stream numPackets*sps: %d", (numPackets*sps));
 
 
-    // Alocate data buffers
+    // Allocate data buffers
     xi_buffer.resize(sps * numPackets);
     xq_buffer.resize(sps * numPackets);
     syncUpdate = 0;
+
 
     return 0;
 }
@@ -222,9 +246,12 @@ int SoapySDRPlay::readStream(
         centerFreq = newCenterFreq;
         centerFreqChanged = false;
 
-        if (freqDiff < rate/2.0) {
+        checkGainPref(centerFreq);
+
+        if (!gainPrefChanged && (freqDiff < rate/2.0)) {
             mir_sdr_SetRf(centerFreq, 1, 0);
         } else {
+            gainPrefChanged = false;
             reInit = true;
         }
 
@@ -240,25 +267,40 @@ int SoapySDRPlay::readStream(
 
     if (reInit)
     {
+        int newSps;
+
         // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
         err = mir_sdr_Uninit();
-        err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
-
-        numPackets = getOptimalPacketsForRate(rate, sps);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init sps: %d", sps);
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init numPackets*sps: %d", (numPackets*sps));
-
-        xi_buffer.resize(sps * numPackets);
-        xq_buffer.resize(sps * numPackets);
+        mir_sdr_SetParam(101, activeGainPref->loFreq);
+        err = mir_sdr_Init(newGr, rate/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &newSps);
 
         if (err != 0) {
             throw std::runtime_error("Error resetting mir_sdr interface for bandwidth change.");
+        }
+
+        if (dcOffsetMode) {
+            mir_sdr_SetDcMode(1, 1);
+        }
+
+        mir_sdr_SetGrParams(0, activeGainPref->grLNA);
+
+        int newPackets = getOptimalPacketsForRate(rate, sps);
+
+        if (newPackets != numPackets || newSps != sps) {
+            numPackets = newPackets;
+            sps = newSps;
+            SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init sps: %d", sps);
+            SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init numPackets*sps: %d", (numPackets*sps));
+
+            xi_buffer.resize(sps * numPackets);
+            xq_buffer.resize(sps * numPackets);
         }
 
         bufferedElems = 0;
         bufferedElemOffset = 0;
         resetBuffer = false;
         grChanged = false;
+        gainPrefChanged = false;
     }
 
 
@@ -302,7 +344,7 @@ int SoapySDRPlay::readStream(
         // Run AGC unless AGC is waiting for update
         if (bufferedElems && !gainElemOfs && !grChanged)
         {
-            double adcPower, ival, qval;
+            double adcPower = 0, ival, qval;
             for (int j = 0; j < bufferedElems; j++)
             {
                 ival = (float)xi_buffer[j]/32767.0;
@@ -311,14 +353,16 @@ int SoapySDRPlay::readStream(
             }
             double avgPower = adcPower / double(bufferedElems);
 
-
             if (adcPower && ((avgPower >= adcHigh) || (avgPower <= adcLow))) {
                 grFilter[0] = 10.0 * log10(adcPower / adcTarget);
                 for (int k = 1; k < GR_FILTER_STEPS; k++) {
                     grFilter[k] += (grFilter[0] - grFilter[k]) * 0.10;
                 }
                 newGr = grFilter[GR_FILTER_STEPS-1];
-//                newGr = 10.0 * log10(adcPower / adcTarget);
+
+                if (newGr > activeGainPref->grMax) {
+                    newGr = activeGainPref->grMax;
+                }
             }
 //            else {
 //                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);
@@ -377,3 +421,16 @@ int SoapySDRPlay::readStream(
 int SoapySDRPlay::getOptimalPacketsForRate(double rate_in, int sps_in) {
     return ceil((rate_in / 30.0)/(float)sps_in);
 }
+
+void SoapySDRPlay::checkGainPref(double frequency) {
+    for (int i = 0, iMax = gainPrefs.size(); i < iMax; i++) {
+        if (frequency >= gainPrefs[i].freqMin && frequency < gainPrefs[i].freqMax) {
+            if (&gainPrefs[i] != activeGainPref) {
+                activeGainPref = &gainPrefs[i];
+                SoapySDR_logf(SOAPY_SDR_DEBUG, "Changed gain preference LO %f", activeGainPref->loFreq);
+                gainPrefChanged = true;
+            }
+        }
+    }
+}
+

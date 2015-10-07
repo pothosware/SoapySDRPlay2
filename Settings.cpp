@@ -48,16 +48,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     numPackets = DEFAULT_NUM_PACKETS;
     bwChanged = false;
 
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 200000: %f", getBwValueFromEnum(getBwEnumForRate(200000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 500000: %f", getBwValueFromEnum(getBwEnumForRate(500000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 1024000: %f", getBwValueFromEnum(getBwEnumForRate(1024000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 2048000: %f", getBwValueFromEnum(getBwEnumForRate(2048000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 4096000: %f", getBwValueFromEnum(getBwEnumForRate(4096000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 8192000: %f", getBwValueFromEnum(getBwEnumForRate(8192000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 10000000: %f", getBwValueFromEnum(getBwEnumForRate(10000000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 12000000: %f", getBwValueFromEnum(getBwEnumForRate(12000000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 13000000: %f", getBwValueFromEnum(getBwEnumForRate(13000000)));
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Bandwidth for 14000000: %f", getBwValueFromEnum(getBwEnumForRate(14000000)));
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
@@ -140,14 +130,15 @@ void SoapySDRPlay::setDCOffsetMode(const int direction, const size_t channel, co
 {
     //enable/disable automatic DC removal
     dcOffsetMode = automatic;
-    if (dcOffsetMode)
-    {
-        mir_sdr_SetDcMode(4,1);
-    }
-    else
-    {
-        mir_sdr_SetDcMode(0,0);
-    }
+//    if (dcOffsetMode)
+//    {
+//        mir_sdr_SetDcMode(4,1);
+//        mir_sdr_SetDcTrackTime(1);
+//    }
+//    else
+//    {
+//        mir_sdr_SetDcMode(0,0);
+//    }
 }
 
 bool SoapySDRPlay::getDCOffsetMode(const int direction, const size_t channel) const

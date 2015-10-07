@@ -36,10 +36,23 @@
 #define DEFAULT_NUM_PACKETS 200
 #define GR_FILTER_STEPS 5
 
+#define SDRPLAY_LO_120 24576000
+#define SDRPLAY_LO_144 22000000
+#define SDRPLAY_LO_168 19200000
+
+class SDRPlayGainPref {
+public:
+    double loFreq;
+    double freqMin, freqMax;
+    int grTarget, grMax, grLNA;
+
+    SDRPlayGainPref(double lo, double min, double max, int targetGain = 40, int lnaGain = 24, int maxGain = 102) : loFreq(lo), freqMin(min), freqMax(max), grTarget(targetGain), grLNA(lnaGain), grMax(maxGain) { }
+};
 
 class SoapySDRPlay : public SoapySDR::Device
 {
 public:
+
     SoapySDRPlay(const SoapySDR::Kwargs &args);
 
     ~SoapySDRPlay(void);
@@ -171,6 +184,12 @@ private:
     static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
     static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
     static int getOptimalPacketsForRate(double rate, int sps);
+
+    SDRPlayGainPref *activeGainPref;
+    bool gainPrefChanged;
+    std::vector<SDRPlayGainPref> gainPrefs;
+
+    void checkGainPref(double frequency);
 
     //device handle
 
