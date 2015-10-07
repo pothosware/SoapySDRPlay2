@@ -1,22 +1,14 @@
 if(NOT LIBSDRPLAY_FOUND)
   # pkg_check_modules (LIBSDRPLAY_PKG libsdrplay)
 
-  if(APPLE)
-    SET(LIBSDRPLAY_HEADER_NAME mir_sdr.h)
-    SET(LIBSDRPLAY_LIB_NAME mir_sdr)
-  else()
-    SET(LIBSDRPLAY_HEADER_NAME, mirsdrapi-rsp.h)
-    SET(LIBSDRPLAY_LIB_NAME, mirsdrapi-rsp)
-  endif()
-
-  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES "${LIBSDRPLAY_HEADER_NAME}"
+  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES mirsdrapi-rsp.h
     PATHS
     /usr/include
     /usr/local/include
   )
   # ${LIBSDRPLAY_PKG_INCLUDE_DIRS}
 
-  find_library(LIBSDRPLAY_LIBRARIES NAMES "${LIBSDRPLAY_LIB_NAME}"
+  find_library(LIBSDRPLAY_LIBRARIES NAMES mirsdrapi-rsp
     PATHS
     /usr/lib
     /usr/local/lib

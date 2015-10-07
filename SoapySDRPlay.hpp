@@ -27,11 +27,7 @@
 #include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
 
-#if __APPLE__
-    #include <mir_sdr.h>
-#else
-    #include <mirsdrapi-rsp.h>
-#endif
+#include <mirsdrapi-rsp.h>
 
 #define DEFAULT_NUM_PACKETS 200
 #define GR_FILTER_STEPS 5
