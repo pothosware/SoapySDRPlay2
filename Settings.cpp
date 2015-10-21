@@ -276,7 +276,22 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> rates;
 
+    rates.push_back(1536000);
     rates.push_back(2000000);
+    rates.push_back(5000000);
+    rates.push_back(5500000);
+    rates.push_back(6000000);
+    rates.push_back(6500000);
+    rates.push_back(7000000);
+    rates.push_back(7500000);
+    rates.push_back(8000000);
+    rates.push_back(8500000);
+    rates.push_back(9000000);
+    rates.push_back(9500000);
+    rates.push_back(10000000);
+    rates.push_back(10500000);
+    rates.push_back(11000000);
+    rates.push_back(11500000);
     rates.push_back(12000000);
     
     return rates;
