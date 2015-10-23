@@ -24,6 +24,38 @@
 
 #include "SoapySDRPlay.hpp"
 
+std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const {
+    std::vector<std::string> formats;
+
+    formats.push_back("CS16");
+    formats.push_back("CF32");
+
+    return formats;
+}
+
+std::string SoapySDRPlay::getNativeStreamFormat(const int direction, const size_t channel, double &fullScale) const {
+    //check that direction is SOAPY_SDR_RX
+     if (direction != SOAPY_SDR_RX) {
+         throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
+     }
+
+     fullScale = 2048;
+     return "CS16";
+}
+
+SoapySDR::ArgInfoList SoapySDRPlay::getStreamArgsInfo(const int direction, const size_t channel) const {
+    //check that direction is SOAPY_SDR_RX
+     if (direction != SOAPY_SDR_RX) {
+         throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
+     }
+
+    SoapySDR::ArgInfoList streamArgs;
+
+    //TODO: add optional SDRPlay stream flags here
+
+    return streamArgs;
+}
+
 
 SoapySDR::Stream *SoapySDRPlay::setupStream(
     const int direction,

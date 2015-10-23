@@ -249,6 +249,14 @@ SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const s
     return rl;
 }
 
+SoapySDR::ArgInfoList SoapySDRPlay::getFrequencyArgsInfo(const int direction, const size_t channel) const {
+    SoapySDR::ArgInfoList freqArgs;
+
+    // TODO: frequency arguments
+
+    return freqArgs;
+}
+
 /*******************************************************************
  * Sample Rate API
  ******************************************************************/
@@ -372,3 +380,26 @@ mir_sdr_Bw_MHzT SoapySDRPlay::mirGetBwMhzEnum(double bw)
 
     return getBwEnumForRate(bw);
 }
+
+
+
+/*******************************************************************
+ * Settings API
+ ******************************************************************/
+
+SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const {
+    SoapySDR::ArgInfoList setArgs;
+
+    // TODO: Settings
+
+    return setArgs;
+}
+
+void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value) {
+
+}
+
+std::string SoapySDRPlay::readSetting(const std::string &key) const {
+    return "";
+}
+
