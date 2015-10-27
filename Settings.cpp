@@ -169,42 +169,66 @@ void SoapySDRPlay::setDCOffset(const int direction, const size_t channel, const 
  * Gain API
  ******************************************************************/
 
-//std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
-//{
-//    //list available gain elements,
-//    //the functions below have a "name" parameter
-//}
-//
-//void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
-//{
-//    //enable AGC if the hardware supports it, or remove this function
-//}
-//
-//bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
-//{
-//    //ditto for the AGC
-//}
-//
-//void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
-//{
-//    //set the overall gain by distributing it across available gain elements
-//    //OR delete this function to use SoapySDR's default gain distribution algorithm...
-//}
-//
-//void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
-//{
-//    //set individual gain element by name
-//}
-//
-//double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
-//{
-//
-//}
-//
-//SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
-//{
-//
-//}
+std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
+{
+    std::vector<std::string> gains;
+
+    gains.push_back("TUNER");
+    gains.push_back("LNAT");
+
+    return gains;
+}
+
+void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
+{
+    agcEnabled = automatic;
+    if (!automatic) {
+        newLnaGr = activeGainPref->grLNA;
+    }
+}
+
+bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
+{
+   return agcEnabled;
+}
+
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
+{
+    setGain(direction,channel,"TUNER",value);
+}
+
+void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
+{
+    if (name == "TUNER") {
+        newGr = 102-value;
+    } else if (name == "LNAT") {
+        newLnaGr = 102-value;
+    } else {
+        throw std::runtime_error("getGainRange -- unknown gain name '"+ name + "'");
+    }
+}
+
+double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
+{
+    if (name == "TUNER") {
+        return 102-newGr;
+    } else if (name == "LNAT") {
+        return 102-newLnaGr;
+    } else {
+        throw std::runtime_error("getGainRange -- unknown gain name '"+ name + "'");
+    }
+}
+
+SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
+{
+    if (name == "TUNER") {
+        return SoapySDR::Range(0,102);
+    } else if (name == "LNAT") {
+        return SoapySDR::Range(0,102);
+    } else {
+        throw std::runtime_error("getGainRange -- unknown gain name '"+ name + "'");
+    }
+}
 
 /*******************************************************************
  * Frequency API

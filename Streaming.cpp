@@ -107,10 +107,12 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     bufferedElems = 0;
     bufferedElemOffset = 0;
     resetBuffer = false;
-    oldGr = newGr = gr = 40;
+    oldGr = oldLnaGr = 0;
+    newGr = 40;
+    newLnaGr = 24;
 
     for (int k = 0; k < GR_FILTER_STEPS; k++) {
-        grFilter[k] = gr;
+        grFilter[k] = newGr;
     }
 
     double dbFs = -10.0;
@@ -374,7 +376,7 @@ int SoapySDRPlay::readStream(
         bufferedElems = (numPackets*sps) - bufferedElemOffset;
 
         // Run AGC unless AGC is waiting for update
-        if (bufferedElems && !gainElemOfs && !grChanged)
+        if (agcEnabled && bufferedElems && !gainElemOfs && !grChanged)
         {
             double adcPower = 0, ival, qval;
             for (int j = 0; j < bufferedElems; j++)
@@ -404,10 +406,18 @@ int SoapySDRPlay::readStream(
             if (newGr != oldGr) {
                 // use absolute value
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
+                oldLnaGr = newLnaGr = activeGainPref->grLNA;
                 err = mir_sdr_SetGr(newGr, 1, syncUpdate);
+                err = mir_sdr_SetGrParams(0, activeGainPref->grLNA);
                 oldGr = newGr;
                 grChanged = true;
             }
+        } else if (!agcEnabled && !grChanged && (newGr != oldGr || newLnaGr != oldLnaGr)) {
+            err = mir_sdr_SetGr(newGr, 1, syncUpdate);
+            err = mir_sdr_SetGrParams(0, newLnaGr);
+            oldGr = newGr;
+            oldLnaGr = newLnaGr;
+            grChanged = true;
         } else if (grChanged) {
             grMisses++;
             if (grMisses >= 10) {
