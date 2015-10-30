@@ -27,7 +27,11 @@
 #include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
 
-#include <mirsdrapi-rsp.h>
+#ifdef _WIN32
+	#include <mir_sdr.h>
+#else
+	#include <mirsdrapi-rsp.h>
+#endif
 
 #define DEFAULT_NUM_PACKETS 200
 #define GR_FILTER_STEPS 5

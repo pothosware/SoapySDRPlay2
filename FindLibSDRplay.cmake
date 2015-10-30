@@ -1,18 +1,30 @@
 if(NOT LIBSDRPLAY_FOUND)
   # pkg_check_modules (LIBSDRPLAY_PKG libsdrplay)
 
-  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES mirsdrapi-rsp.h
-    PATHS
-    /usr/include
-    /usr/local/include
-  )
-  # ${LIBSDRPLAY_PKG_INCLUDE_DIRS}
+  IF(WIN32)
+	  find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES mir_sdr.h
+		PATHS
+		[HKEY_LOCAL_MACHINE\\SOFTWARE\\MiricsSDR\\API;InstallDIR]
+	  )
 
-  find_library(LIBSDRPLAY_LIBRARIES NAMES mirsdrapi-rsp
-    PATHS
-    /usr/lib
-    /usr/local/lib
-  )
+	  find_library(LIBSDRPLAY_LIBRARIES NAMES mir_sdr_api.lib
+		PATHS
+		[HKEY_LOCAL_MACHINE\\SOFTWARE\\MiricsSDR\\API;InstallDIR]
+	  )
+  ELSE()
+	   find_path(LIBSDRPLAY_INCLUDE_DIRS NAMES mirsdrapi-rsp.h
+		PATHS
+		/usr/include
+		/usr/local/include
+	  )
+
+	  find_library(LIBSDRPLAY_LIBRARIES NAMES mirsdrapi-rsp
+		PATHS
+		/usr/lib
+		/usr/local/lib
+	  )
+  ENDIF()
+  # ${LIBSDRPLAY_PKG_INCLUDE_DIRS}
   # ${LIBSDRPLAY_PKG_LIBRARY_DIRS}
 
 if(LIBSDRPLAY_INCLUDE_DIRS AND LIBSDRPLAY_LIBRARIES)
