@@ -433,8 +433,15 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const {
     IFArg.name = "Low IF (when available)";
     IFArg.description = "Use low IF when available: 0.5MHz SR with 200 and 300khz BW, 1MHz SR with 600kHz BW, 2048kHz SR with 1536kHz BW";
     IFArg.type=SoapySDR::ArgInfo::BOOL;
-    IFArg.range= SoapySDR::Range(0,1);
     setArgs.push_back(IFArg);
+
+    SoapySDR::ArgInfo AIFArg;
+    AIFArg.key="actual_IF";
+    AIFArg.value=ifMode;
+    AIFArg.name = "Actual IF";
+    AIFArg.description = "Currently used IF frequency in kHz";
+    AIFArg.type=SoapySDR::ArgInfo::INT;
+    setArgs.push_back(AIFArg);
 
     return setArgs;
 }
@@ -448,6 +455,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const {
     if (key=="use_low_if") return tryLowIF?"true":"false";
+    if (key=="actual_IF") return std::to_string(ifMode);
     return "";
 }
 
