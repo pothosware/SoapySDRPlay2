@@ -340,6 +340,7 @@ mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned 
         rv=mir_sdr_DownConvert(&downsample_buffer[0],xi,xq,realspp,ifMode,mirDSF,0);
         if (rv!=0) return rv;
     }
+    if (ownDSF==1) return rv;
     // stupid decimation.... do averaging instead and we may be able to increase ENOB!
     int s=ownDSF;   // source index starts here as 0th sample is not moved
     for (int t=1;t<sps;t++) {
