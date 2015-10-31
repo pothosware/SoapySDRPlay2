@@ -154,7 +154,7 @@ double SoapySDRPlay::getHWRate() {
 }
 
 int SoapySDRPlay::getDSFactor() {
-    double threshold=rate*0.03;    // 30000 ppm allowed error for detecting downsampling factor
+    double threshold=rate*0.01;    // 10000 ppm allowed error for detecting downsampling factor
     if (std::abs(rate-222222.222)<threshold) return 9;
     if (std::abs(rate-333333.333)<threshold) return 6;
     if (std::abs(rate-428571.428)<threshold) return 7;
