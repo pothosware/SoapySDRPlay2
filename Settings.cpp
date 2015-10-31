@@ -287,6 +287,10 @@ SoapySDR::ArgInfoList SoapySDRPlay::getFrequencyArgsInfo(const int direction, co
 
 void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate_in)
 {
+    // TODO implement clamping to allowed sample rates 1MHz and below (200k, 300k, 400k, 500k, 600k, 750k, 800k, 1M)
+    // BUT also allow X ppm deviation! (see mir_sdr_SetFs doc)
+    // X has to be determined by solving a nice catch-22 that i just can not describe now :)
+    // newRate can deviate from allowed valies as described.
     newRate = rate_in;
     rateChanged = true;
 }
@@ -308,6 +312,14 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> rates;
 
+    rates.push_back(222222.222);
+    rates.push_back(333333.333);
+    rates.push_back(428571.428);
+    rates.push_back(500000);
+    rates.push_back(571428.571);
+    rates.push_back(750000);
+    rates.push_back(875000);
+    rates.push_back(1000000);
     rates.push_back(1536000);
     rates.push_back(2000000);
     rates.push_back(5000000);
