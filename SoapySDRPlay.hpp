@@ -207,6 +207,7 @@ private:
     double getHWRate();
     int getDSFactor();
     mir_sdr_ErrT ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged);
+    void initDS();
 
     SDRPlayGainPref *activeGainPref;
     bool gainPrefChanged;
@@ -239,6 +240,11 @@ private:
     double centerFreq, newCenterFreq;
     double rate, newRate;
     double bw, newBw;
+    mir_sdr_If_kHzT ifMode;
+    bool tryLowIF;
+    int totalDSF;
+    int mirDSF;
+    int ownDSF;
 
     bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
 };

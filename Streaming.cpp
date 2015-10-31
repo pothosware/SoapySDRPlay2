@@ -231,8 +231,9 @@ int SoapySDRPlay::activateStream(
     // Configure DC tracking in tuner
     mir_sdr_ErrT err;
     mir_sdr_SetParam(101, activeGainPref->loFreq);
+    initDS();
     // convert rate to sdrplay rate here with getHWRate() (downsampling support)
-    err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &sps);
+    err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &sps);
 
     if (err != 0) {
         throw std::runtime_error("activateStream failed.");
@@ -279,19 +280,23 @@ int SoapySDRPlay::deactivateStream(
     return 0;
 }
 
+void SoapySDRPlay::initDS() {
+    ifMode=mir_sdr_IF_Zero;
+    mirDSF=1;
+    ownDSF=getDSFactor();
+    totalDSF=ownDSF*mirDSF;
+}
 mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged)
 {
     mir_sdr_ErrT rv;
-    int dsf=getDSFactor();
-    int realspp=dsf*sps;
     rv=mir_sdr_ReadPacket(xi, xq, firstSampleNum, grChanged, rfChanged, fsChanged);
-    if (dsf==1) return rv;
+    if (totalDSF==1) return rv;
     // stupid decimation.... do averaging instead and we may be able to increase ENOB!
-    int s=0;
+    int s=ownDSF;   // source index starts here as 0th sample is not moved
     for (int t=1;t<sps;t++) {
         xi[t]=xi[s];
         xq[t]=xq[s];
-        s+=dsf;
+        s+=ownDSF;
     }
     return rv;
 }
@@ -366,8 +371,9 @@ int SoapySDRPlay::readStream(
         // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
         err = mir_sdr_Uninit();
         mir_sdr_SetParam(101, activeGainPref->loFreq);
+        initDS();
         // convert rate to sdrplay rate here with getHWRate() (downsampling support)
-        err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), mir_sdr_IF_Zero, &newSps);
+        err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &newSps);
 
         if (err != 0) {
             throw std::runtime_error("Error resetting mir_sdr interface for bandwidth change.");
