@@ -26,6 +26,7 @@
 
 #include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
+#include <stdexcept>
 #include <vector>
 
 #ifdef _WIN32
