@@ -47,6 +47,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     syncUpdate = 0;
     numPackets = DEFAULT_NUM_PACKETS;
     bwChanged = false;
+    tryLowIF=true;
+    tryLowIFChanged=false;
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
@@ -448,13 +450,15 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const {
 
 void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value) {
     if (key=="use_low_if") {
-        tryLowIF = (value == "true") ? true : false;
-        SoapySDR_logf(SOAPY_SDR_DEBUG, "SDRPlay Low IF mode: %s", tryLowIF ? "true" : "false");
+        newTryLowIF = (value == "true") ? true : false;
+        tryLowIFChanged=true;
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "SDRPlay setting tryLowIF: %s", newTryLowIF ? "true" : "false");
     }
 }
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const {
-    if (key=="use_low_if") return tryLowIF?"true":"false";
+    if (key=="use_low_if" && tryLowIFChanged) return newTryLowIF?"true":"false";
+    if (key=="use_low_if" && !tryLowIFChanged) return tryLowIF?"true":"false";
     if (key=="actual_IF") return std::to_string(ifMode);
     return "";
 }

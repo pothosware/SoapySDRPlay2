@@ -212,6 +212,11 @@ int SoapySDRPlay::activateStream(
     checkGainPref(centerFreq);
     gainPrefChanged = false;
 
+    if (tryLowIFChanged) {
+        tryLowIF=newTryLowIF;
+        tryLowIFChanged=false;
+    }
+
     if (rateChanged) {
         rate = newRate;
         rateChanged = false;
@@ -228,6 +233,7 @@ int SoapySDRPlay::activateStream(
         bw = getBwValueFromEnum(eBw);
         bwChanged = false;
     }
+
 
     // Configure DC tracking in tuner
     mir_sdr_ErrT err;
@@ -366,6 +372,12 @@ int SoapySDRPlay::readStream(
     {
         resetBuffer = false;
         bufferedElems = 0;
+    }
+
+    if (tryLowIFChanged) {
+        tryLowIF=newTryLowIF;
+        tryLowIFChanged=false;
+        reInit=true;
     }
 
     if (rateChanged)

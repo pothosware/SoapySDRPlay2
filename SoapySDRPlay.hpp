@@ -241,7 +241,7 @@ private:
     double rate, newRate;
     double bw, newBw;
     mir_sdr_If_kHzT ifMode;
-    bool tryLowIF;
+    bool tryLowIF, newTryLowIF,tryLowIFChanged;
     int totalDSF;
     int mirDSF;
     int ownDSF;
