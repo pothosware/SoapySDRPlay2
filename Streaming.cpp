@@ -323,6 +323,7 @@ int SoapySDRPlay::readStream(
     {
         rate = newRate;
         rateChanged = false;
+        reInit = true;
 
         mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
         double bwCheckVal = getBwValueFromEnum(bwCheck);
