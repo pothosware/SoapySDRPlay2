@@ -289,8 +289,9 @@ mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned 
     // stupid decimation.... do averaging instead and we may be able to increase ENOB!
     int s=0;
     for (int t=1;t<sps;t++) {
-        xi[t]=xi[t*dsf];
-        xq[t]=xq[t*dsf];
+        xi[t]=xi[s];
+        xq[t]=xq[s];
+        s+=dsf;
     }
     return rv;
 }
