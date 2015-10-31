@@ -481,7 +481,7 @@ int SoapySDRPlay::readStream(
             if (err != 0)
             {
                 SoapySDR_logf(SOAPY_SDR_CRITICAL, "ds_mir_sdr_ReadPacket() error: %d", err);
-                return SOAPY_SDR_TIMEOUT;
+                return SOAPY_SDR_STREAM_ERROR;
             }
             if (grc) {
                 SoapySDR_logf(SOAPY_SDR_DEBUG, "Gain change acknowledged from device. packet: %d", i);
