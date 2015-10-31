@@ -447,7 +447,7 @@ int SoapySDRPlay::readStream(
 
         mir_sdr_SetGrParams(0, activeGainPref->grLNA);
 
-        int newPackets = getOptimalPacketsForRate(rate, sps);
+        int newPackets = getOptimalPacketsForRate(rate, newSps);
 
         if (newPackets != numPackets || newSps != sps) {
             numPackets = newPackets;
