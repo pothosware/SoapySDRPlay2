@@ -47,7 +47,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     syncUpdate = 0;
     numPackets = DEFAULT_NUM_PACKETS;
     bwChanged = false;
-
+    tryLowIF=true;
+    tryLowIFChanged=false;
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
@@ -287,6 +288,10 @@ SoapySDR::ArgInfoList SoapySDRPlay::getFrequencyArgsInfo(const int direction, co
 
 void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate_in)
 {
+    // TODO implement clamping to allowed sample rates 1MHz and below (200k, 300k, 400k, 500k, 600k, 750k, 800k, 1M)
+    // BUT also allow X ppm deviation! (see mir_sdr_SetFs doc)
+    // X has to be determined by solving a nice catch-22 that i just can not describe now :)
+    // newRate can deviate from allowed valies as described.
     newRate = rate_in;
     rateChanged = true;
 }
@@ -308,8 +313,17 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 {
     std::vector<double> rates;
 
+    rates.push_back(222222.222);
+    rates.push_back(333333.333);
+    rates.push_back(428571.428);
+    rates.push_back(500000);
+    rates.push_back(571428.571);
+    rates.push_back(750000);
+    rates.push_back(875000);
+    rates.push_back(1000000);
     rates.push_back(1536000);
     rates.push_back(2000000);
+    rates.push_back(2048000);
     rates.push_back(5000000);
     rates.push_back(5500000);
     rates.push_back(6000000);
@@ -415,15 +429,37 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const {
     SoapySDR::ArgInfoList setArgs;
 
     // TODO: Settings
+    SoapySDR::ArgInfo IFArg;
+    IFArg.key="use_low_if";
+    IFArg.value="true";
+    IFArg.name = "Low IF (when available)";
+    IFArg.description = "Use low IF when available: 0.5MHz SR with 200 and 300khz BW, 1MHz SR with 600kHz BW, 2048kHz SR with 1536kHz BW";
+    IFArg.type=SoapySDR::ArgInfo::BOOL;
+    setArgs.push_back(IFArg);
+
+    SoapySDR::ArgInfo AIFArg;
+    AIFArg.key="actual_IF";
+    AIFArg.value=ifMode;
+    AIFArg.name = "Actual IF";
+    AIFArg.description = "Currently used IF frequency in kHz";
+    AIFArg.type=SoapySDR::ArgInfo::INT;
+    setArgs.push_back(AIFArg);
 
     return setArgs;
 }
 
 void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value) {
-
+    if (key=="use_low_if") {
+        newTryLowIF = (value == "true") ? true : false;
+        tryLowIFChanged=true;
+        SoapySDR_logf(SOAPY_SDR_DEBUG, "SDRPlay setting tryLowIF: %s", newTryLowIF ? "true" : "false");
+    }
 }
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const {
+    if (key=="use_low_if" && tryLowIFChanged) return newTryLowIF?"true":"false";
+    if (key=="use_low_if" && !tryLowIFChanged) return tryLowIF?"true":"false";
+    if (key=="actual_IF") return std::to_string(ifMode);
     return "";
 }
 

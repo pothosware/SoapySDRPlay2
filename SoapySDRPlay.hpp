@@ -27,6 +27,7 @@
 #include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
 #include <stdexcept>
+#include <vector>
 
 #ifdef _WIN32
 	#include <mir_sdr.h>
@@ -203,6 +204,11 @@ private:
     static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
     static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
     static int getOptimalPacketsForRate(double rate, int sps);
+    std::vector<short>::size_type getOwnBufferSize();
+    double getHWRate();
+    int getDSFactor();
+    mir_sdr_ErrT ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged);
+    void initDS();
 
     SDRPlayGainPref *activeGainPref;
     bool gainPrefChanged;
@@ -217,6 +223,7 @@ private:
     bool resetBuffer;
     std::vector<short> xi_buffer;
     std::vector<short> xq_buffer;
+    std::vector<short> downsample_buffer;
     unsigned int fs;
     int syncUpdate;
 
@@ -234,6 +241,11 @@ private:
     double centerFreq, newCenterFreq;
     double rate, newRate;
     double bw, newBw;
+    mir_sdr_If_kHzT ifMode;
+    bool tryLowIF, newTryLowIF,tryLowIFChanged;
+    int totalDSF;
+    int mirDSF;
+    int ownDSF;
 
     bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
 };
