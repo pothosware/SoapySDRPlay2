@@ -163,6 +163,7 @@ int SoapySDRPlay::getDSFactor() {
     if (std::abs(rate-750000)<threshold) return 4;
     if (std::abs(rate-875000)<threshold) return 8;
     if (std::abs(rate-1000000)<threshold) return 2;
+    if (std::abs(rate-2048000)<threshold && tryLowIF) return 4;
     return 1;
 }
 
@@ -284,13 +285,55 @@ void SoapySDRPlay::initDS() {
     ifMode=mir_sdr_IF_Zero;
     mirDSF=1;
     ownDSF=getDSFactor();
+    if (tryLowIF) {
+        double threshold=10000;
+        if (
+                std::abs(rate-2048000)<threshold
+                && std::abs(getHWRate()-8192000)<threshold
+                && mirGetBwMhzEnum(bw)==mir_sdr_BW_1_536
+                ) 
+        {
+            mirDSF=4;
+            ifMode=mir_sdr_IF_2_048;
+        }
+        if (
+                std::abs(rate-1000000)<threshold
+                && std::abs(getHWRate()-2000000.0)<threshold
+                && mirGetBwMhzEnum(bw)==mir_sdr_BW_0_600
+                ) 
+        {
+            mirDSF=2;
+            ifMode=mir_sdr_IF_0_450;
+        }
+        if (
+                std::abs(rate-500000)<threshold
+                && std::abs(getHWRate()-2000000.0)<threshold
+                && (mirGetBwMhzEnum(bw)==mir_sdr_BW_0_300 || mirGetBwMhzEnum(bw)==mir_sdr_BW_0_200)
+                ) 
+        {
+            mirDSF=4;
+            ifMode=mir_sdr_IF_0_450;
+        }
+        ownDSF/=mirDSF;
+    }
     totalDSF=ownDSF*mirDSF;
+    SoapySDR_logf(SOAPY_SDR_DEBUG, "SDRPlay downsampling: IF %d, API decimation %d, Own decimation %d", ifMode,mirDSF,ownDSF);
 }
+
 mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged)
 {
     mir_sdr_ErrT rv;
-    rv=mir_sdr_ReadPacket(xi, xq, firstSampleNum, grChanged, rfChanged, fsChanged);
-    if (totalDSF==1) return rv;
+    if (mirDSF==1) {
+        rv=mir_sdr_ReadPacket(xi, xq, firstSampleNum, grChanged, rfChanged, fsChanged);
+        if (totalDSF==1) return rv;
+        if (rv!=0) return rv;
+    } else {
+        int realspp=sps*totalDSF;
+        rv=mir_sdr_ReadPacket(&downsample_buffer[0], xq, firstSampleNum, grChanged, rfChanged, fsChanged);
+        if (rv!=0) return rv;
+        rv=mir_sdr_DownConvert(&downsample_buffer[0],xi,xq,realspp,ifMode,mirDSF,0);
+        if (rv!=0) return rv;
+    }
     // stupid decimation.... do averaging instead and we may be able to increase ENOB!
     int s=ownDSF;   // source index starts here as 0th sample is not moved
     for (int t=1;t<sps;t++) {
@@ -300,6 +343,7 @@ mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned 
     }
     return rv;
 }
+
 int SoapySDRPlay::readStream(
     SoapySDR::Stream *stream,
     void * const *buffs,
@@ -424,6 +468,7 @@ int SoapySDRPlay::readStream(
             //return SOAPY_SDR_TIMEOUT when timeout occurs
             if (err != 0)
             {
+                SoapySDR_logf(SOAPY_SDR_CRITICAL, "ds_mir_sdr_ReadPacket() error: %d", err);
                 return SOAPY_SDR_TIMEOUT;
             }
             if (grc) {
