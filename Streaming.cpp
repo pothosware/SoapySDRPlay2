@@ -251,7 +251,7 @@ int SoapySDRPlay::activateStream(
         throw std::runtime_error("mir_sdr_ReadPacket() packet size incompatibility.");
     }
 
-    if (dcOffsetMode) {
+    if (dcOffsetMode && !ifMode) {
         mir_sdr_SetDcMode(1, 1);
     }
 
@@ -440,7 +440,7 @@ int SoapySDRPlay::readStream(
             throw std::runtime_error("mir_sdr_ReadPacket() packet size incompatibility.");
         }
 
-        if (dcOffsetMode) {
+        if (dcOffsetMode && !ifMode) {
             mir_sdr_SetDcMode(1, 1);
         }
 
