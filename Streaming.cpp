@@ -141,28 +141,28 @@ size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
 
 double SoapySDRPlay::getHWRate() {
     /*
-    if (abs(rate-200000)<10000) return 2000000;
-    if (abs(rate-300000)<10000) return 3000000;
-    if (abs(rate-400000)<10000) return 2000000;
-    if (abs(rate-500000)<10000) return 2000000;
-    if (abs(rate-600000)<10000) return 3000000;
-    if (abs(rate-750000)<10000) return 3000000;
-    if (abs(rate-800000)<10000) return 4000000;
-    if (abs(rate-1000000)<10000) return 2000000;
+    if (fabs(rate-200000)<10000) return 2000000;
+    if (fabs(rate-300000)<10000) return 3000000;
+    if (fabs(rate-400000)<10000) return 2000000;
+    if (fabs(rate-500000)<10000) return 2000000;
+    if (fabs(rate-600000)<10000) return 3000000;
+    if (fabs(rate-750000)<10000) return 3000000;
+    if (fabs(rate-800000)<10000) return 4000000;
+    if (fabs(rate-1000000)<10000) return 2000000;
     */
     return rate*getDSFactor();
 }
 
 int SoapySDRPlay::getDSFactor() {
     double threshold=rate*0.03;    // 30000 ppm allowed error for detecting downsampling factor
-    if (abs(rate-222222.222)<threshold) return 9;
-    if (abs(rate-333333.333)<threshold) return 6;
-    if (abs(rate-428571.428)<threshold) return 7;
-    if (abs(rate-500000)<threshold) return 4;
-    if (abs(rate-571428.571)<threshold) return 7;
-    if (abs(rate-750000)<threshold) return 4;
-    if (abs(rate-875000)<threshold) return 8;
-    if (abs(rate-1000000)<threshold) return 2;
+    if (std::abs(rate-222222.222)<threshold) return 9;
+    if (std::abs(rate-333333.333)<threshold) return 6;
+    if (std::abs(rate-428571.428)<threshold) return 7;
+    if (std::abs(rate-500000)<threshold) return 4;
+    if (std::abs(rate-571428.571)<threshold) return 7;
+    if (std::abs(rate-750000)<threshold) return 4;
+    if (std::abs(rate-875000)<threshold) return 8;
+    if (std::abs(rate-1000000)<threshold) return 2;
     return 1;
 }
 
