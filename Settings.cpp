@@ -47,7 +47,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     syncUpdate = 0;
     numPackets = DEFAULT_NUM_PACKETS;
     bwChanged = false;
-    SoapySDR_setLogLevel(SOAPY_SDR_DEBUG);
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
