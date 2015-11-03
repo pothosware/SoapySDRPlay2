@@ -202,6 +202,8 @@ private:
 
     static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
     static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
+    static mir_sdr_If_kHzT stringToIF(std::string ifMode);
+    static std::string IFtoString(mir_sdr_If_kHzT ifkHzT);
     static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
     static int getOptimalPacketsForRate(double rate, int sps);
     std::vector<short>::size_type getOwnBufferSize();
