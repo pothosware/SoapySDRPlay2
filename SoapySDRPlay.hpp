@@ -28,6 +28,8 @@
 #include <SoapySDR/Device.hpp>
 #include <stdexcept>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 	#include <mir_sdr.h>
@@ -248,6 +250,7 @@ private:
     int totalDSF;
     int mirDSF;
     int ownDSF;
+    bool streamActive;
 
     bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
 };

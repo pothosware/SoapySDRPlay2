@@ -50,6 +50,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     tryLowIF=true;
     tryLowIFChanged=false;
     ifMode = mir_sdr_IF_Zero;
+    streamActive = false;
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)

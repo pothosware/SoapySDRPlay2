@@ -63,6 +63,8 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     const std::vector<size_t> &channels,
     const SoapySDR::Kwargs &args)
 {
+    streamActive = false;
+
     //check that direction is SOAPY_SDR_RX
     if (direction != SOAPY_SDR_RX) {
         throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
@@ -126,68 +128,6 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
 
     SoapySDR_logf(SOAPY_SDR_DEBUG, "ADC gain targets min/target/max: %f, %f, %f", adcLow, adcTarget, adcHigh);
 
-    return (SoapySDR::Stream *)this;
-}
-
-void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
-{
-
-}
-
-size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
-{
-    return sps*numPackets;
-}
-
-double SoapySDRPlay::getHWRate() {
-    /*
-    if (fabs(rate-200000)<10000) return 2000000;
-    if (fabs(rate-300000)<10000) return 3000000;
-    if (fabs(rate-400000)<10000) return 2000000;
-    if (fabs(rate-500000)<10000) return 2000000;
-    if (fabs(rate-600000)<10000) return 3000000;
-    if (fabs(rate-750000)<10000) return 3000000;
-    if (fabs(rate-800000)<10000) return 4000000;
-    if (fabs(rate-1000000)<10000) return 2000000;
-    */
-    return rate*getDSFactor();
-}
-
-int SoapySDRPlay::getDSFactor() {
-    double threshold=rate*0.01;    // 10000 ppm allowed error for detecting downsampling factor
-    if (std::abs(rate-222222.222)<threshold) return 9;
-    if (std::abs(rate-333333.333)<threshold) return 6;
-    if (std::abs(rate-428571.428)<threshold) return 7;
-    if (std::abs(rate-500000)<threshold) return 4;
-    if (std::abs(rate-571428.571)<threshold) return 7;
-    if (std::abs(rate-750000)<threshold) return 4;
-    if (std::abs(rate-875000)<threshold) return 8;
-    if (std::abs(rate-1000000)<threshold) return 2;
-    if (std::abs(rate-2048000)<threshold && tryLowIF) return 4;
-    return 1;
-}
-
-std::vector<short>::size_type SoapySDRPlay::getOwnBufferSize()
-{
-    return sps*numPackets+getDSFactor()*sps;
-    //sps is downsampled readpacket size
-    //i add one unit of real readpacket size to make sure
-    //the there is enough space for the readpacket call when the wrapper
-    //is called to fill the end of the buffer
-}
-
-int SoapySDRPlay::activateStream(
-    SoapySDR::Stream *stream,
-    const int flags,
-    const long long timeNs,
-    const size_t numElems)
-{
-    //probably can ignore flags and time and numElems
-    //these are for timed burst features
-    //however it might be nice to return SOAPY_SDR_NOT_SUPPORTED
-    //when flags != or or numElems != 0
-
-    //this function should actually enable the hardware to stream
 
     if (centerFreqChanged) {
         centerFreq = newCenterFreq;
@@ -270,6 +210,70 @@ int SoapySDRPlay::activateStream(
     downsample_buffer.resize(sps*getDSFactor());
     syncUpdate = 0;
 
+    return (SoapySDR::Stream *)this;
+}
+
+void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
+{
+    mir_sdr_ErrT err;
+    err = mir_sdr_Uninit();
+}
+
+size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
+{
+    return sps*numPackets;
+}
+
+double SoapySDRPlay::getHWRate() {
+    /*
+    if (fabs(rate-200000)<10000) return 2000000;
+    if (fabs(rate-300000)<10000) return 3000000;
+    if (fabs(rate-400000)<10000) return 2000000;
+    if (fabs(rate-500000)<10000) return 2000000;
+    if (fabs(rate-600000)<10000) return 3000000;
+    if (fabs(rate-750000)<10000) return 3000000;
+    if (fabs(rate-800000)<10000) return 4000000;
+    if (fabs(rate-1000000)<10000) return 2000000;
+    */
+    return rate*getDSFactor();
+}
+
+int SoapySDRPlay::getDSFactor() {
+    double threshold=rate*0.01;    // 10000 ppm allowed error for detecting downsampling factor
+    if (std::abs(rate-222222.222)<threshold) return 9;
+    if (std::abs(rate-333333.333)<threshold) return 6;
+    if (std::abs(rate-428571.428)<threshold) return 7;
+    if (std::abs(rate-500000)<threshold) return 4;
+    if (std::abs(rate-571428.571)<threshold) return 7;
+    if (std::abs(rate-750000)<threshold) return 4;
+    if (std::abs(rate-875000)<threshold) return 8;
+    if (std::abs(rate-1000000)<threshold) return 2;
+    if (std::abs(rate-2048000)<threshold && tryLowIF) return 4;
+    return 1;
+}
+
+std::vector<short>::size_type SoapySDRPlay::getOwnBufferSize()
+{
+    return sps*numPackets+getDSFactor()*sps;
+    //sps is downsampled readpacket size
+    //i add one unit of real readpacket size to make sure
+    //the there is enough space for the readpacket call when the wrapper
+    //is called to fill the end of the buffer
+}
+
+int SoapySDRPlay::activateStream(
+    SoapySDR::Stream *stream,
+    const int flags,
+    const long long timeNs,
+    const size_t numElems)
+{
+    //probably can ignore flags and time and numElems
+    //these are for timed burst features
+    //however it might be nice to return SOAPY_SDR_NOT_SUPPORTED
+    //when flags != or or numElems != 0
+
+    //this function should actually enable the hardware to stream
+    streamActive = true;
 
     return 0;
 }
@@ -281,8 +285,8 @@ int SoapySDRPlay::deactivateStream(
 {
     //same idea as activateStream,
     //but disable streaming in the hardware
-    mir_sdr_ErrT err;
-    err = mir_sdr_Uninit();
+
+    streamActive = false;
 
     return 0;
 }
@@ -360,6 +364,11 @@ int SoapySDRPlay::readStream(
     const long timeoutUs)
 {
     mir_sdr_ErrT err;
+
+    if (!streamActive) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return 0;
+    }
 
     //this is the user's buffer for channel 0
     void *buff0 = buffs[0];
