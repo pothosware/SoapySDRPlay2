@@ -24,7 +24,6 @@
 
 #include "SoapySDRPlay.hpp"
 
-
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
     //TODO use args to instantiate correct device handle
@@ -50,6 +49,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     tryLowIF=true;
     tryLowIFChanged=false;
     ifMode = mir_sdr_IF_Zero;
+    agcEnabled = false;
     streamActive = false;
 }
 
@@ -418,7 +418,7 @@ mir_sdr_Bw_MHzT SoapySDRPlay::mirGetBwMhzEnum(double bw)
     else if (bw == 7000000) return mir_sdr_BW_7_000;
     else if (bw == 8000000) return mir_sdr_BW_8_000;
 
-    return getBwEnumForRate(bw);
+    return getBwEnumForRate(rateChanged ? newRate : rate);
 }
 
 mir_sdr_If_kHzT SoapySDRPlay::stringToIF(std::string ifMode) {
