@@ -146,6 +146,8 @@ public:
      * Gain API
      ******************************************************************/
 
+    bool hasGainMode(const int direction, const size_t channel) const;
+
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
 
     void setGainMode(const int direction, const size_t channel, const bool automatic);

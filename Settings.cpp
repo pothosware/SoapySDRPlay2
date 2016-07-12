@@ -172,6 +172,11 @@ void SoapySDRPlay::setDCOffset(const int direction, const size_t channel, const 
  * Gain API
  ******************************************************************/
 
+bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
+{
+    return true;
+}
+
 std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size_t channel) const
 {
     std::vector<std::string> gains;
