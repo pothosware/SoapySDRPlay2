@@ -179,6 +179,7 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(
     mir_sdr_ErrT err;
     mir_sdr_SetParam(101, activeGainPref->loFreq);
     initDS();
+    mir_sdr_SetTransferMode(mir_sdr_BULK);
     // convert rate to sdrplay rate here with getHWRate() (downsampling support)
     err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &sps);
 
@@ -438,6 +439,7 @@ int SoapySDRPlay::readStream(
         err = mir_sdr_Uninit();
         mir_sdr_SetParam(101, activeGainPref->loFreq);
         initDS();
+        mir_sdr_SetTransferMode(mir_sdr_BULK);
         // convert rate to sdrplay rate here with getHWRate() (downsampling support)
         err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &newSps);
 
