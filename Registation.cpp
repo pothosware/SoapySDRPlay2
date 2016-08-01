@@ -38,7 +38,8 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
     //or identification number. Use this information
     //to filter the results when the specified keys do not match
     int sps;
-
+    
+    mir_sdr_SetTransferMode(mir_sdr_BULK);
     if (!mir_sdr_Init(40, 2.048, 222.064, mir_sdr_BW_1_536, mir_sdr_IF_Zero, &sps))
     {
         mir_sdr_Uninit();
