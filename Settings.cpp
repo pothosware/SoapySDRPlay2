@@ -453,6 +453,9 @@ std::string SoapySDRPlay::IFtoString(mir_sdr_If_kHzT ifkHzT) {
         case mir_sdr_IF_2_048:
             return "2048kHz";
         break;
+        case mir_sdr_IF_Undefined:
+            return "";
+        break;
     }
     return "";
 }
