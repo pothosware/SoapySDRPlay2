@@ -408,20 +408,20 @@ int SoapySDRPlay::readStream(
 
     if (centerFreqChanged)
     {
-        double freqDiff = std::abs(centerFreq-newCenterFreq);
+        double oldCenterFreq = centerFreq;
         centerFreq = newCenterFreq;
         centerFreqChanged = false;
 
         checkGainPref(centerFreq);
 
-        if (!gainPrefChanged && (freqDiff < rate/2.0)) {
+        if (!gainPrefChanged && !freqBandChanged(newCenterFreq, oldCenterFreq) ) {
             mir_sdr_SetRf(centerFreq, 1, 0);
         } else {
             gainPrefChanged = false;
             reInit = true;
         }
 
-        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed center frequency");
+        SoapySDR_logf(SOAPY_SDR_DEBUG,"Changed center frequency : %f", newCenterFreq);
     }
 
     if (bwChanged)
@@ -476,6 +476,8 @@ int SoapySDRPlay::readStream(
         resetBuffer = false;
         grChanged = false;
         gainPrefChanged = false;
+
+        SoapySDR_log(SOAPY_SDR_DEBUG, "ReInit");
     }
 
 
@@ -616,5 +618,27 @@ void SoapySDRPlay::checkGainPref(double frequency) {
             }
         }
     }
+}
+
+// check whether centre frequency changed band
+bool SoapySDRPlay::freqBandChanged(double currentFreq, double newFreq) {
+	if ( getFreqBand(currentFreq) != getFreqBand(newFreq) )
+		return true;
+	else
+		return false;
+}
+
+
+// returns a band number for a frequency band
+int SoapySDRPlay::getFreqBand(double frequency) {
+	if (frequency >= 10000 && frequency < 12000000) return 0;
+	else if (frequency >= 12000000 && frequency < 30000000) return 1;
+	else if (frequency >= 30000000 && frequency < 60000000) return 2;
+	else if (frequency >= 60000000 && frequency < 120000000) return 3;
+	else if (frequency >= 120000000 && frequency < 250000000) return 4;
+	else if (frequency >= 250000000 && frequency < 420000000) return 5;
+	else if (frequency >= 420000000 && frequency < 1000000000) return 6;
+	else if (frequency >= 1000000000 && frequency < 2000000000) return 7;
+	else return 8;
 }
 

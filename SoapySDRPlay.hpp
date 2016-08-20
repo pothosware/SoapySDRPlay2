@@ -221,6 +221,8 @@ private:
     std::vector<SDRPlayGainPref> gainPrefs;
 
     void checkGainPref(double frequency);
+    bool freqBandChanged(double currentFreq, double newFreq);
+    int getFreqBand(double frequency);
 
     //device handle
 
