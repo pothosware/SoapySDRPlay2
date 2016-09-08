@@ -246,8 +246,17 @@ void SoapySDRPlay::setFrequency(const int direction, const size_t channel, const
 {
     if (name == "RF")
     {
-        newCenterFreq = frequency;
-        centerFreqChanged = true;
+	if (frequency < 10000) {
+	  newCenterFreq = 10000;
+	  SoapySDR_log(SOAPY_SDR_WARNING, "SDRPlay center frequency clamped to 10KHz");
+	}
+	else if (frequency > 2000000000) {
+	  newCenterFreq = 2000000000;
+          SoapySDR_log(SOAPY_SDR_WARNING, "SDRPlay center frequency clamped to 2.0GHz");
+	} else {
+	  newCenterFreq = frequency;
+        }
+	centerFreqChanged = true;
     }
 }
 
@@ -276,7 +285,7 @@ SoapySDR::RangeList SoapySDRPlay::getFrequencyRange(const int direction, const s
     SoapySDR::RangeList rl;
     if (name == "RF")
     {
-        rl.push_back(SoapySDR::Range(100000.0,2000000000.0));
+        rl.push_back(SoapySDR::Range(10000.0,2000000000.0));
     }
     return rl;
 }
