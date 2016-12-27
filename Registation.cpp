@@ -25,37 +25,58 @@
 #include "SoapySDRPlay.hpp"
 #include <SoapySDR/Registry.hpp>
 
+#if !defined(_M_X64) && !defined(_M_IX86)
+#define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
+#endif
+
+#define MAX_RSP_DEVICES  (4)
+
+static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
+bool deviceSelected = false;
+
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
-    std::vector<SoapySDR::Kwargs> results;
+   std::vector<SoapySDR::Kwargs> results;
+   std::string strargs = SoapySDR::KwargsToString(args);
+   unsigned int nDevs = 0;
+   char lblstr[128];
 
-    //enumerate devices, each device gets an entry in the results
-    //results should contain identifying information about each device
-    //like a serial number or some kind of identification number.
+   if (deviceSelected == true)
+   {
+      mir_sdr_ReleaseDeviceIdx();
+      deviceSelected = false;
+   }
+   mir_sdr_DebugEnable(1);
+   mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
-    //TODO filtering
-    //when the user passes input args like a serial number
-    //or identification number. Use this information
-    //to filter the results when the specified keys do not match
-    int sps;
-    
-    mir_sdr_SetTransferMode(mir_sdr_BULK);
-    if (!mir_sdr_Init(40, 2.048, 222.064, mir_sdr_BW_1_536, mir_sdr_IF_Zero, &sps))
-    {
-        mir_sdr_Uninit();
-        SoapySDR::Kwargs dev;
-
-        dev["driver"] = "mir_sdr";
-        dev["label"] = "SDRPlay RSP";
-
-        results.push_back(dev);
-    }
-    else
-    {
-        mir_sdr_Uninit();
-    }
-
-    return results;
+   size_t posidx = strargs.find("SDRplay Dev");
+   if (posidx != std::string::npos)
+   {
+      unsigned int devIdx = strargs.at(posidx + 11) - 0x30;
+      if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail))
+      {
+         SoapySDR::Kwargs dev;
+         dev["driver"] = "sdrplay";
+         sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", devIdx, rspDevs[devIdx].hwVer, rspDevs[devIdx].SerNo);
+         dev["label"] = lblstr;
+         results.push_back(dev);
+      }
+   }
+   else
+   {
+      for (unsigned int i = 0; i < nDevs; i++)
+      {
+         if (rspDevs[i].devAvail)
+         {
+            SoapySDR::Kwargs dev;
+            dev["driver"] = "sdrplay";
+            sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
+            dev["label"] = lblstr;
+            results.push_back(dev);
+         }
+      }
+   }
+   return results;
 }
 
 static SoapySDR::Device *makeSDRPlay(const SoapySDR::Kwargs &args)

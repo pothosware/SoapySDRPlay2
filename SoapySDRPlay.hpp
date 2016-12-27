@@ -21,42 +21,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-
 #pragma once
 
-#include <SoapySDR/Logger.h>
 #include <SoapySDR/Device.hpp>
+#include <SoapySDR/Logger.h>
+#include <SoapySDR/Types.h>
 #include <stdexcept>
-#include <vector>
-#include <chrono>
 #include <thread>
+#include <mutex>
+#include <atomic>
+#include <condition_variable>
+#include <string>
+#include <cstring>
+#include <algorithm>
 
 #ifdef _WIN32
-	#include <mir_sdr.h>
+#include <mir_sdr.h>
 #else
-	#include <mirsdrapi-rsp.h>
+#include <mirsdrapi-rsp.h>
 #endif
 
-#define DEFAULT_NUM_PACKETS 200
-#define GR_FILTER_STEPS 5
+#define DEFAULT_BUFFER_LENGTH     (65536)
+#define DEFAULT_NUM_BUFFERS       (8)
+#define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
-#define SDRPLAY_LO_120 24576000
-#define SDRPLAY_LO_144 22000000
-#define SDRPLAY_LO_168 19200000
-
-class SDRPlayGainPref {
-public:
-    double loFreq;
-    double freqMin, freqMax;
-    int grTarget, grMax, grLNA;
-
-    SDRPlayGainPref(double lo, double min, double max, int targetGain = 40, int lnaGain = 24, int maxGain = 102) : loFreq(lo), freqMin(min), freqMax(max), grTarget(targetGain), grLNA(lnaGain), grMax(maxGain) { }
-};
-
-class SoapySDRPlay : public SoapySDR::Device
+class SoapySDRPlay: public SoapySDR::Device
 {
 public:
-
     SoapySDRPlay(const SoapySDR::Kwargs &args);
 
     ~SoapySDRPlay(void);
@@ -87,34 +78,45 @@ public:
 
     SoapySDR::ArgInfoList getStreamArgsInfo(const int direction, const size_t channel) const;
 
-    SoapySDR::Stream *setupStream(
-        const int direction,
-        const std::string &format,
-        const std::vector<size_t> &channels = std::vector<size_t>(),
-        const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+    SoapySDR::Stream *setupStream(const int direction, 
+                                  const std::string &format, 
+                                  const std::vector<size_t> &channels = std::vector<size_t>(), 
+                                  const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
 
     void closeStream(SoapySDR::Stream *stream);
 
     size_t getStreamMTU(SoapySDR::Stream *stream) const;
 
-    int activateStream(
-        SoapySDR::Stream *stream,
-        const int flags = 0,
-        const long long timeNs = 0,
-        const size_t numElems = 0);
+    int activateStream(SoapySDR::Stream *stream,
+                       const int flags = 0,
+                       const long long timeNs = 0,
+                       const size_t numElems = 0);
 
-    int deactivateStream(
-        SoapySDR::Stream *stream,
-        const int flags = 0,
-        const long long timeNs = 0);
+    int deactivateStream(SoapySDR::Stream *stream, const int flags = 0, const long long timeNs = 0);
 
-    int readStream(
-        SoapySDR::Stream *stream,
-        void * const *buffs,
-        const size_t numElems,
-        int &flags,
-        long long &timeNs,
-        const long timeoutUs = 100000);
+    int readStream(SoapySDR::Stream *stream,
+                   void * const *buffs,
+                   const size_t numElems,
+                   int &flags,
+                   long long &timeNs,
+                   const long timeoutUs = 200000);
+
+    /*******************************************************************
+     * Direct buffer access API
+     ******************************************************************/
+
+    size_t getNumDirectAccessBuffers(SoapySDR::Stream *stream);
+
+    int getDirectAccessBufferAddrs(SoapySDR::Stream *stream, const size_t handle, void **buffs);
+
+    int acquireReadBuffer(SoapySDR::Stream *stream,
+                          size_t &handle,
+                          const void **buffs,
+                          int &flags,
+                          long long &timeNs,
+                          const long timeoutUs = 100000);
+
+    void releaseReadBuffer(SoapySDR::Stream *stream, const size_t handle);
 
     /*******************************************************************
      * Antenna API
@@ -122,7 +124,7 @@ public:
 
     std::vector<std::string> listAntennas(const int direction, const size_t channel) const;
 
-//    void setAntenna(const int direction, const size_t channel, const std::string &name);
+    void setAntenna(const int direction, const size_t channel, const std::string &name);
 
     std::string getAntenna(const int direction, const size_t channel) const;
 
@@ -132,29 +134,17 @@ public:
 
     bool hasDCOffsetMode(const int direction, const size_t channel) const;
 
-    void setDCOffsetMode(const int direction, const size_t channel, const bool automatic);
-
-    bool getDCOffsetMode(const int direction, const size_t channel) const;
-
-    bool hasDCOffset(const int direction, const size_t channel) const;
-
-    void setDCOffset(const int direction, const size_t channel, const std::complex<double> &offset);
-
-//    std::complex<double> getDCOffset(const int direction, const size_t channel) const;
-
     /*******************************************************************
      * Gain API
      ******************************************************************/
 
-    bool hasGainMode(const int direction, const size_t channel) const;
-
     std::vector<std::string> listGains(const int direction, const size_t channel) const;
+
+    bool hasGainMode(const int direction, const size_t channel) const;
 
     void setGainMode(const int direction, const size_t channel, const bool automatic);
 
     bool getGainMode(const int direction, const size_t channel) const;
-
-    void setGain(const int direction, const size_t channel, const double value);
 
     void setGain(const int direction, const size_t channel, const std::string &name, const double value);
 
@@ -166,10 +156,16 @@ public:
      * Frequency API
      ******************************************************************/
 
-    void setFrequency(const int direction, const size_t channel, const std::string &name, const double frequency, const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
+    void setFrequency(const int direction,
+                      const size_t channel,
+                      const std::string &name,
+                      const double frequency,
+                      const SoapySDR::Kwargs &args = SoapySDR::Kwargs());
 
     double getFrequency(const int direction, const size_t channel, const std::string &name) const;
 
+    SoapySDR::RangeList getBandwidthRange(const int direction, const size_t channel) const;
+    
     std::vector<std::string> listFrequencies(const int direction, const size_t channel) const;
 
     SoapySDR::RangeList getFrequencyRange(const int direction, const size_t channel, const std::string &name) const;
@@ -186,11 +182,21 @@ public:
 
     std::vector<double> listSampleRates(const int direction, const size_t channel) const;
 
+    /*******************************************************************
+    * Bandwidth API
+    ******************************************************************/
+
     void setBandwidth(const int direction, const size_t channel, const double bw);
 
     double getBandwidth(const int direction, const size_t channel) const;
 
     std::vector<double> listBandwidths(const int direction, const size_t channel) const;
+    
+    void setDCOffsetMode(const int direction, const size_t channel, const bool automatic);
+    
+    bool getDCOffsetMode(const int direction, const size_t channel) const;
+    
+    bool hasDCOffset(const int direction, const size_t channel) const;
 
     /*******************************************************************
      * Settings API
@@ -202,59 +208,91 @@ public:
 
     std::string readSetting(const std::string &key) const;
 
+    /*******************************************************************
+     * Async API
+     ******************************************************************/
+
+    void rx_callback(short *xi, short *xq, unsigned int numSamples);
+
+    void gr_callback(unsigned int gRdB, unsigned int lnaGRdB);
+
 private:
 
-    mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
-    static mir_sdr_Bw_MHzT getBwEnumForRate(double rate);
+    /*******************************************************************
+     * Internal functions
+     ******************************************************************/
+
+    static double getRateForBwEnum(mir_sdr_Bw_MHzT bwEnum);
+
+    static uint32_t getInputSampleRateAndDecimation(uint32_t rate, unsigned int *decM, unsigned int *decEnable, mir_sdr_If_kHzT ifMode);
+
+    static mir_sdr_Bw_MHzT getBwEnumForRate(double rate, mir_sdr_If_kHzT ifMode);
+
+    static  double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
+
+    static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
+
     static mir_sdr_If_kHzT stringToIF(std::string ifMode);
+
     static std::string IFtoString(mir_sdr_If_kHzT ifkHzT);
-    static double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
-    static int getOptimalPacketsForRate(double rate, int sps);
-    std::vector<short>::size_type getOwnBufferSize();
-    double getHWRate();
-    int getDSFactor();
-    mir_sdr_ErrT ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged);
-    void initDS();
 
-    SDRPlayGainPref *activeGainPref;
-    bool gainPrefChanged;
-    std::vector<SDRPlayGainPref> gainPrefs;
+    /*******************************************************************
+     * Private variables
+     ******************************************************************/
+    //device settings
+    mir_sdr_Bw_MHzT bwMode;
+    mir_sdr_If_kHzT ifMode;
+    float ver;
 
-    void checkGainPref(double frequency);
-    bool freqBandChanged(double currentFreq, double newFreq);
-    int getFreqBand(double frequency);
-
-    //device handle
-
-    //stream
-    int bufferedElems, bufferedElemOffset;
-    bool resetBuffer;
-    std::vector<short> xi_buffer;
-    std::vector<short> xq_buffer;
-    std::vector<short> downsample_buffer;
-    unsigned int fs;
-    int syncUpdate;
+    int gRdB;
+    int gRdBsystem;
+    int sps;
+    int lnaState;
+    unsigned char hwVer;
 
     //cached settings
-    float ver;
-    bool dcOffsetMode;
-    int sps;
-    int grc, rfc, fsc;
-    int newGr, newLnaGr;
-    double adcLow, adcHigh, adcTarget;
-    double grFilter[GR_FILTER_STEPS];
-    int oldGr, oldLnaGr, grMisses;
-    int numPackets;
-    bool agcEnabled, grChanged;
-    double centerFreq, newCenterFreq;
-    double rate, newRate;
-    double bw, newBw;
-    mir_sdr_If_kHzT ifMode;
-    bool tryLowIF, newTryLowIF,tryLowIFChanged;
-    int totalDSF;
-    int mirDSF;
-    int ownDSF;
+    uint32_t sampleRate;
+    uint32_t reqSampleRate;
+    unsigned int decM;
+    unsigned int decEnable;
+    uint32_t centerFrequency;
+    double ppm;
+    unsigned int bufferLength;
+    unsigned int bufferElems;
+    unsigned int shortsPerWord;
+    size_t numBuffers;
+    mir_sdr_AgcControlT agcMode;
     bool streamActive;
+    int elementsPerSample;
+    bool dcOffsetMode;
+    bool useShort;
 
-    bool rxFloat, centerFreqChanged, rateChanged, bwChanged;
+    unsigned int IQcorr;
+    int setPoint;
+
+    mir_sdr_RSPII_AntennaSelectT antSel;
+    int amPort;
+    unsigned int extRef;
+    unsigned int biasTen;
+    unsigned int notechEn;
+    std::string serNo;
+
+public:
+
+   /*******************************************************************
+    * Public variables
+    ******************************************************************/
+    
+    std::mutex _buf_mutex;
+    std::condition_variable _buf_cond;
+
+    std::vector<std::vector<short> > _buffs;
+    size_t	_buf_head;
+    size_t	_buf_tail;
+    size_t	_buf_count;
+    short *_currentBuff;
+    bool _overflowEvent;
+    size_t bufferedElems;
+    size_t _currentHandle;
+    bool resetBuffer;
 };

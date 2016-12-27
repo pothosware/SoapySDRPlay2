@@ -24,7 +24,8 @@
 
 #include "SoapySDRPlay.hpp"
 
-std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const {
+std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, const size_t channel) const 
+{
     std::vector<std::string> formats;
 
     formats.push_back("CS16");
@@ -33,612 +34,332 @@ std::vector<std::string> SoapySDRPlay::getStreamFormats(const int direction, con
     return formats;
 }
 
-std::string SoapySDRPlay::getNativeStreamFormat(const int direction, const size_t channel, double &fullScale) const {
-    //check that direction is SOAPY_SDR_RX
-     if (direction != SOAPY_SDR_RX) {
-         throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
-     }
-
-     fullScale = 2048;
+std::string SoapySDRPlay::getNativeStreamFormat(const int direction, const size_t channel, double &fullScale) const 
+{
+     fullScale = 32767;
      return "CS16";
 }
 
-SoapySDR::ArgInfoList SoapySDRPlay::getStreamArgsInfo(const int direction, const size_t channel) const {
-    //check that direction is SOAPY_SDR_RX
-     if (direction != SOAPY_SDR_RX) {
-         throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
-     }
-
+SoapySDR::ArgInfoList SoapySDRPlay::getStreamArgsInfo(const int direction, const size_t channel) const 
+{
     SoapySDR::ArgInfoList streamArgs;
-
-    //TODO: add optional SDRPlay stream flags here
 
     return streamArgs;
 }
 
+/*******************************************************************
+ * Async thread work
+ ******************************************************************/
 
-SoapySDR::Stream *SoapySDRPlay::setupStream(
-    const int direction,
-    const std::string &format,
-    const std::vector<size_t> &channels,
-    const SoapySDR::Kwargs &args)
+static void _rx_callback(short *xi, short *xq, unsigned int firstSampleNum, int grChanged, int rfChanged, 
+                         int fsChanged, unsigned int numSamples, unsigned int reset, void *cbContext)
 {
-    streamActive = false;
+    SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
+    return self->rx_callback(xi, xq, numSamples);
+}
 
-    //check that direction is SOAPY_SDR_RX
-    if (direction != SOAPY_SDR_RX) {
-        throw std::runtime_error("SDRPlay is RX only, use SOAPY_SDR_RX");
+static void _gr_callback(unsigned int gRdB, unsigned int lnaGRdB, void *cbContext)
+{
+    SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
+    return self->gr_callback(gRdB, lnaGRdB);
+}
+
+void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples)
+{
+    std::unique_lock<std::mutex> lock(_buf_mutex);
+
+    if (_buf_count == numBuffers)
+    {
+        _overflowEvent = true;
+        return;
+    }
+    
+    int spaceReqd = numSamples * elementsPerSample * shortsPerWord;
+    if ((_buffs[_buf_tail].size() + spaceReqd) >= (bufferLength / decM))
+    {
+       // increment the tail pointer and buffer count
+       _buf_tail = (_buf_tail + 1) % numBuffers;
+       _buf_count++;
+
+       // notify readStream()
+       _buf_cond.notify_one();
     }
 
-    //check the channel configuration
-        //check than channels is either empty or [0]
-    if (channels.size() > 1 or (channels.size() > 0 and channels.at(0) != 0))
-    {
-        throw std::runtime_error("setupStream invalid channel selection");
-    }
+    // get current fill buffer
+    auto &buff = _buffs[_buf_tail];
+    buff.resize(buff.size() + spaceReqd);
 
-    //check the format
-    if (format == "CF32")
+    // copy into the buffer queue
+    unsigned int i = 0;
+
+    if (useShort)
     {
-        SoapySDR_log(SOAPY_SDR_INFO, "Using format CF32.");
-        rxFloat = true;
-    }
-    else if (format == "CS16")
-    {
-        SoapySDR_log(SOAPY_SDR_INFO, "Using format CS16.");
-        rxFloat = false;
+       short *dptr = buff.data();
+       dptr += (buff.size() - spaceReqd);
+       for (i = 0; i < numSamples; i++)
+       {
+           *dptr++ = xi[i];
+           *dptr++ = xq[i];
+        }
     }
     else
     {
-        throw std::runtime_error("setupStream invalid format '" + format + "' -- Only CS16 and CF32 are supported by SoapySDRPlay, and CS16 is the native format.");
+       float *dptr = (float *)buff.data();
+       dptr += ((buff.size() - spaceReqd) / shortsPerWord);
+       for (i = 0; i < numSamples; i++)
+       {
+          *dptr++ = (float)xi[i] / 32768.0f;
+          *dptr++ = (float)xq[i] / 32768.0f;
+       }
     }
 
+    return;
+}
 
-//    if (args.count("buffer_packets") != 0) {
-//        int numPackets_in = std::stoi(args.at("buffer_packets"));
-//        if (std::isnan(numPackets_in) || numPackets_in == 0) {
-//            SoapySDR_logf(SOAPY_SDR_DEBUG, "numPackets is 0 or not a number; defaulting to %d", numPackets);
-//        } else {
-//            numPackets = numPackets_in;
-//        }
-//    }
-//    SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
+void SoapySDRPlay::gr_callback(unsigned int gRdB, unsigned int lnaGRdB)
+{
+    return;
+}
 
-    //TODO: add optional SDRPlay stream flags here
+/*******************************************************************
+ * Stream API
+ ******************************************************************/
 
-    bufferedElems = 0;
-    bufferedElemOffset = 0;
-    resetBuffer = false;
-    oldGr = oldLnaGr = 0;
-    newGr = 40;
-    newLnaGr = 24;
-
-    for (int k = 0; k < GR_FILTER_STEPS; k++) {
-        grFilter[k] = newGr;
+SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
+                                            const std::string &format,
+                                            const std::vector<size_t> &channels,
+                                            const SoapySDR::Kwargs &args)
+{
+    // check the channel configuration
+    if (channels.size() > 1 or (channels.size() > 0 and channels.at(0) != 0)) 
+    {
+       throw std::runtime_error("setupStream invalid channel selection");
     }
 
-    double dbFs = -10.0;
-    double dbFsRange = 5;
+    bufferLength = bufferElems * elementsPerSample;
 
-    adcLow = expf((double)(dbFs-dbFsRange)/10.0);
-    adcTarget = expf((double)dbFs/10.0);
-    adcHigh = expf((double)(dbFs+dbFsRange)/10.0);
-
-    grMisses = 0;
-
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "ADC gain targets min/target/max: %f, %f, %f", adcLow, adcTarget, adcHigh);
-
-
-    if (centerFreqChanged) {
-        centerFreq = newCenterFreq;
-        centerFreqChanged = false;
+    // check the format
+    if (format == "CS16") 
+    {
+        useShort = true;
+        SoapySDR_log(SOAPY_SDR_INFO, "Using format CS16.");
+    } 
+    else if (format == "CF32") 
+    {
+        useShort = false;
+        shortsPerWord = sizeof(float) / sizeof(short);
+        bufferLength *= shortsPerWord;  // allocate enough space for floats instead of shorts
+        SoapySDR_log(SOAPY_SDR_INFO, "Using format CF32.");
+    } 
+    else 
+    {
+       throw std::runtime_error( "setupStream invalid format '" + format +
+                                  "' -- Only CS16 or CF32 are supported by the SoapySDRPlay module.");
     }
 
+    // clear async fifo counts
+    _buf_tail = 0;
+    _buf_head = 0;
+    _buf_count = 0;
 
-    if (SoapySDRPlay::gainPrefs.empty()) {
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 100000, 12000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 12000000, 30000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 30000000, 60000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 60000000, 120000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 120000000, 250000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 250000000, 375000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_144, 375000000, 395000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_168, 395000000, 420000000));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 420000000, 1000000000, 40, 7, 85));
-        gainPrefs.push_back(SDRPlayGainPref(SDRPLAY_LO_120, 1000000000, 2000000000, 40, 5, 85));
-    }
+    // allocate buffers
+    _buffs.resize(numBuffers);
+    for (auto &buff : _buffs) buff.reserve(bufferLength);
+    for (auto &buff : _buffs) buff.clear();
 
-    activeGainPref = &gainPrefs[0];
-    checkGainPref(centerFreq);
-    gainPrefChanged = false;
-
-    if (tryLowIFChanged) {
-        tryLowIF=newTryLowIF;
-        tryLowIFChanged=false;
-    }
-
-    if (rateChanged) {
-        rate = newRate;
-        rateChanged = false;
-
-        mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
-        double bwCheckVal = getBwValueFromEnum(bwCheck);
-        if (bwCheckVal != bw) {
-            bw = bwCheckVal;
-            bwChanged = false;
-            SoapySDR_logf(SOAPY_SDR_DEBUG, "Changed bandwidth for rate %f to %f", rate, bw);
-        }
-    } else if (bwChanged) {
-        mir_sdr_Bw_MHzT eBw = getBwEnumForRate(newBw);
-        bw = getBwValueFromEnum(eBw);
-        bwChanged = false;
-    }
-
-
-    // Configure DC tracking in tuner
-    mir_sdr_ErrT err;
-    mir_sdr_SetParam(101, activeGainPref->loFreq);
-    initDS();
-    mir_sdr_SetTransferMode(mir_sdr_BULK);
-    // convert rate to sdrplay rate here with getHWRate() (downsampling support)
-    err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &sps);
-
-    if (err != 0) {
-        throw std::runtime_error("activateStream failed.");
-    }
-    int realspp=sps;
-    sps/=getDSFactor();         // sps holds the downsampled readpacket size
-    if (realspp!=getDSFactor()*sps) {
-        throw std::runtime_error("mir_sdr_ReadPacket() packet size incompatibility.");
-    }
-
-    if (dcOffsetMode && !ifMode) {
-        mir_sdr_SetDcMode(1, 1);
-    }
-
-    mir_sdr_SetGrParams(0, activeGainPref->grLNA);
-
-    numPackets = getOptimalPacketsForRate(rate, sps);
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "Set numPackets to %d", numPackets);
-
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "stream sps: %d", sps);
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "stream numPackets*sps: %d", (numPackets*sps));
-
-
-    // Allocate data buffers
-    xi_buffer.resize(getOwnBufferSize());
-    xq_buffer.resize(getOwnBufferSize());
-    downsample_buffer.resize(sps*getDSFactor());
-    syncUpdate = 0;
-
-    return (SoapySDR::Stream *)this;
+    return (SoapySDR::Stream *) this;
 }
 
 void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
 {
-    mir_sdr_ErrT err;
-    err = mir_sdr_Uninit();
+    if (streamActive)
+    {
+        mir_sdr_StreamUninit();
+    }
+    streamActive = false;
+    return;
 }
 
 size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
 {
-    return sps*numPackets;
+    return bufferElems;
 }
 
-double SoapySDRPlay::getHWRate() {
-    /*
-    if (fabs(rate-200000)<10000) return 2000000;
-    if (fabs(rate-300000)<10000) return 3000000;
-    if (fabs(rate-400000)<10000) return 2000000;
-    if (fabs(rate-500000)<10000) return 2000000;
-    if (fabs(rate-600000)<10000) return 3000000;
-    if (fabs(rate-750000)<10000) return 3000000;
-    if (fabs(rate-800000)<10000) return 4000000;
-    if (fabs(rate-1000000)<10000) return 2000000;
-    */
-    return rate*getDSFactor();
-}
-
-int SoapySDRPlay::getDSFactor() {
-    double threshold=rate*0.01;    // 10000 ppm allowed error for detecting downsampling factor
-    if (std::abs(rate-222222.222)<threshold) return 9;
-    if (std::abs(rate-333333.333)<threshold) return 6;
-    if (std::abs(rate-428571.428)<threshold) return 7;
-    if (std::abs(rate-500000)<threshold) return 4;
-    if (std::abs(rate-571428.571)<threshold) return 7;
-    if (std::abs(rate-750000)<threshold) return 4;
-    if (std::abs(rate-875000)<threshold) return 8;
-    if (std::abs(rate-1000000)<threshold) return 2;
-    if (std::abs(rate-2048000)<threshold && tryLowIF) return 4;
-    return 1;
-}
-
-std::vector<short>::size_type SoapySDRPlay::getOwnBufferSize()
+int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
+                                 const int flags,
+                                 const long long timeNs,
+                                 const size_t numElems)
 {
-    return sps*numPackets+getDSFactor()*sps;
-    //sps is downsampled readpacket size
-    //i add one unit of real readpacket size to make sure
-    //the there is enough space for the readpacket call when the wrapper
-    //is called to fill the end of the buffer
-}
+    if (flags != 0) 
+    {
+        return SOAPY_SDR_NOT_SUPPORTED;
+    }
+    
+    resetBuffer = true;
+    bufferedElems = 0;
+    
+    mir_sdr_ErrT err;
+    
+    mir_sdr_DebugEnable(1);
 
-int SoapySDRPlay::activateStream(
-    SoapySDR::Stream *stream,
-    const int flags,
-    const long long timeNs,
-    const size_t numElems)
-{
-    //probably can ignore flags and time and numElems
-    //these are for timed burst features
-    //however it might be nice to return SOAPY_SDR_NOT_SUPPORTED
-    //when flags != or or numElems != 0
+    err = mir_sdr_StreamInit(&gRdB, sampleRate / 1e6, centerFrequency / 1e6, bwMode,
+                             ifMode, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps,
+                             _rx_callback, _gr_callback, (void *)this);
+    if (err != mir_sdr_Success)
+    {
+       //throw std::runtime_error("StreamInit Error: " + std::to_string(err));
+       return SOAPY_SDR_NOT_SUPPORTED;
+    }
+    mir_sdr_DecimateControl(decEnable, decM, 0);
 
-    //this function should actually enable the hardware to stream
+    mir_sdr_SetDcMode(4,0);
+    mir_sdr_SetDcTrackTime(63);
+    
     streamActive = true;
-
+    
     return 0;
 }
 
-int SoapySDRPlay::deactivateStream(
-    SoapySDR::Stream *stream,
-    const int flags,
-    const long long timeNs)
+int SoapySDRPlay::deactivateStream(SoapySDR::Stream *stream, const int flags, const long long timeNs)
 {
-    //same idea as activateStream,
-    //but disable streaming in the hardware
+    if (flags != 0)
+    {
+        return SOAPY_SDR_NOT_SUPPORTED;
+    }
+
+    if (streamActive)
+    {
+        mir_sdr_StreamUninit();
+    }
 
     streamActive = false;
-
+    
     return 0;
 }
 
-void SoapySDRPlay::initDS() {
-    ifMode=mir_sdr_IF_Zero;
-    mirDSF=1;
-    ownDSF=getDSFactor();
-    if (tryLowIF) {
-        double threshold=10000;
-        if (
-                std::abs(rate-2048000)<threshold
-                && std::abs(getHWRate()-8192000)<threshold
-                && mirGetBwMhzEnum(bw)==mir_sdr_BW_1_536
-                ) 
-        {
-            mirDSF=4;
-            ifMode=mir_sdr_IF_2_048;
-        }
-        if (
-                std::abs(rate-1000000)<threshold
-                && std::abs(getHWRate()-2000000.0)<threshold
-                && mirGetBwMhzEnum(bw)==mir_sdr_BW_0_600
-                ) 
-        {
-            mirDSF=2;
-            ifMode=mir_sdr_IF_0_450;
-        }
-        if (
-                std::abs(rate-500000)<threshold
-                && std::abs(getHWRate()-2000000.0)<threshold
-                && (mirGetBwMhzEnum(bw)==mir_sdr_BW_0_300 || mirGetBwMhzEnum(bw)==mir_sdr_BW_0_200)
-                ) 
-        {
-            mirDSF=4;
-            ifMode=mir_sdr_IF_0_450;
-        }
-        ownDSF/=mirDSF;
-    }
-    totalDSF=ownDSF*mirDSF;
-    SoapySDR_logf(SOAPY_SDR_DEBUG, "SDRPlay downsampling: IF %d, API decimation %d, Own decimation %d", ifMode,mirDSF,ownDSF);
-}
-
-mir_sdr_ErrT SoapySDRPlay::ds_mir_sdr_ReadPacket(short *xi, short *xq, unsigned int *firstSampleNum, int *grChanged, int *rfChanged, int *fsChanged)
-{
-    mir_sdr_ErrT rv;
-    if (mirDSF==1) {
-        rv=mir_sdr_ReadPacket(xi, xq, firstSampleNum, grChanged, rfChanged, fsChanged);
-        if (totalDSF==1) return rv;
-        if (rv!=0) return rv;
-    } else {
-        int realspp=sps*totalDSF;
-        rv=mir_sdr_ReadPacket(&downsample_buffer[0], xq, firstSampleNum, grChanged, rfChanged, fsChanged);
-        if (rv!=0) return rv;
-        rv=mir_sdr_DownConvert(&downsample_buffer[0],xi,xq,realspp,ifMode,mirDSF,0);
-        if (rv!=0) return rv;
-    }
-    if (ownDSF==1) return rv;
-    // stupid decimation.... do averaging instead and we may be able to increase ENOB!
-    int s=ownDSF;   // source index starts here as 0th sample is not moved
-    for (int t=1;t<sps;t++) {
-        xi[t]=xi[s];
-        xq[t]=xq[s];
-        s+=ownDSF;
-    }
-    return rv;
-}
-
-int SoapySDRPlay::readStream(
-    SoapySDR::Stream *stream,
-    void * const *buffs,
-    const size_t numElems,
-    int &flags,
-    long long &timeNs,
-    const long timeoutUs)
-{
-    mir_sdr_ErrT err;
-
-    if (!streamActive) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
+                             void * const *buffs,
+                             const size_t numElems,
+                             int &flags,
+                             long long &timeNs,
+                             const long timeoutUs)
+{    
+    if (!streamActive) 
+    {
         return 0;
     }
-
-    //this is the user's buffer for channel 0
+    
+    // this is the user's buffer for channel 0
     void *buff0 = buffs[0];
 
-    //check for data with timeout
-    // TODO: Can we do?
-
-    bool reInit = false;
-
-    if (resetBuffer)
-    {
-        resetBuffer = false;
-        bufferedElems = 0;
-    }
-
-    if (tryLowIFChanged) {
-        tryLowIF=newTryLowIF;
-        tryLowIFChanged=false;
-        reInit=true;
-    }
-
-    if (rateChanged)
-    {
-        rate = newRate;
-        rateChanged = false;
-        reInit = true;
-
-        mir_sdr_Bw_MHzT bwCheck = getBwEnumForRate(rate);
-        double bwCheckVal = getBwValueFromEnum(bwCheck);
-
-        bwChanged = true;
-        newBw = bwCheckVal;
-
-        SoapySDR_log(SOAPY_SDR_DEBUG,"Changed sample rate");
-    }
-
-    if (centerFreqChanged)
-    {
-        double oldCenterFreq = centerFreq;
-        centerFreq = newCenterFreq;
-        centerFreqChanged = false;
-
-        checkGainPref(centerFreq);
-
-        if (!gainPrefChanged && !freqBandChanged(newCenterFreq, oldCenterFreq) ) {
-            mir_sdr_SetRf(centerFreq, 1, 0);
-        } else {
-            gainPrefChanged = false;
-            reInit = true;
-        }
-
-        SoapySDR_logf(SOAPY_SDR_DEBUG,"Changed center frequency : %f", newCenterFreq);
-    }
-
-    if (bwChanged)
-    {
-        bw = newBw;
-        bwChanged = false;
-        reInit = true;
-    }
-
-    if (reInit)
-    {
-        int newSps;
-
-        // "For large ADC sample frequency changes a mir_sdr_Uninit and mir_sdr_Init at the new sample rate must be performed."
-        err = mir_sdr_Uninit();
-        mir_sdr_SetParam(101, activeGainPref->loFreq);
-        initDS();
-        mir_sdr_SetTransferMode(mir_sdr_BULK);
-        // convert rate to sdrplay rate here with getHWRate() (downsampling support)
-        err = mir_sdr_Init(newGr, getHWRate()/1000000.0, centerFreq/1000000.0, mirGetBwMhzEnum(bw), ifMode, &newSps);
-
-        if (err != 0) {
-            throw std::runtime_error("Error resetting mir_sdr interface for bandwidth change.");
-        }
-        int realspp=newSps;
-        newSps/=getDSFactor();         // sps holds the downsampled readpacket size
-        if (realspp!=getDSFactor()*newSps) {
-            throw std::runtime_error("mir_sdr_ReadPacket() packet size incompatibility.");
-        }
-
-        if (dcOffsetMode && !ifMode) {
-            mir_sdr_SetDcMode(1, 1);
-        }
-
-        mir_sdr_SetGrParams(0, activeGainPref->grLNA);
-
-        int newPackets = getOptimalPacketsForRate(rate, newSps);
-
-        if (newPackets != numPackets || newSps != sps) {
-            numPackets = newPackets;
-            sps = newSps;
-            SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init sps: %d", sps);
-            SoapySDR_logf(SOAPY_SDR_DEBUG, "stream re-init numPackets*sps: %d", (numPackets*sps));
-
-            xi_buffer.resize(getOwnBufferSize());
-            xq_buffer.resize(getOwnBufferSize());
-            downsample_buffer.resize(sps*getDSFactor());
-        }
-
-        bufferedElems = 0;
-        bufferedElemOffset = 0;
-        resetBuffer = false;
-        grChanged = false;
-        gainPrefChanged = false;
-
-        SoapySDR_log(SOAPY_SDR_DEBUG, "ReInit");
-    }
-
-
-    //are elements left in the buffer? if not, do a new read.
+    // are elements left in the buffer? if not, do a new read.
     if (bufferedElems == 0)
     {
-        bufferedElemOffset = 0;
-        int gainElemOfs = 0;
-
-        //receive into temporary buffer
-        for (int i = 0; i < numPackets; i++)
+        int ret = this->acquireReadBuffer(stream, _currentHandle, (const void **)&_currentBuff, flags, timeNs, timeoutUs);
+        if (ret < 0)
         {
-            err = ds_mir_sdr_ReadPacket(&xi_buffer[sps*i], &xq_buffer[sps*i], &fs, &grc, &rfc, &fsc);
-            //return SOAPY_SDR_TIMEOUT when timeout occurs
-            if (err != 0)
-            {
-                SoapySDR_logf(SOAPY_SDR_CRITICAL, "ds_mir_sdr_ReadPacket() error: %d", err);
-                return SOAPY_SDR_STREAM_ERROR;
-            }
-            if (grc) {
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "Gain change acknowledged from device. packet: %d", i);
-                grChanged = false; // indicate where change occurred
-                mir_sdr_ResetUpdateFlags(1,0,0);
-                gainElemOfs = i * sps;
-            }
-            if (rfc) {
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "Center frequency change acknowledged from device. packet: %d", i);
-                mir_sdr_ResetUpdateFlags(0,1,0);
-                bufferedElemOffset = i * sps;
-                gainElemOfs = i * sps;
-            }
-            if (fsc) {  // This shouldn't happen now but leaving it to see..
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "Rate change acknowledged from device. packet: %d", i);
-                mir_sdr_ResetUpdateFlags(0,0,1);
-                bufferedElemOffset = i * sps;
-                gainElemOfs = i * sps;
-            }
+            return ret;
         }
-
-        bufferedElems = (numPackets*sps) - bufferedElemOffset;
-
-        // Run AGC unless AGC is waiting for update
-        if (agcEnabled && bufferedElems && !gainElemOfs && !grChanged)
-        {
-            double adcPower = 0, ival, qval;
-            for (int j = 0; j < bufferedElems; j++)
-            {
-                ival = (float)xi_buffer[j]/32767.0;
-                qval = (float)xq_buffer[j]/32767.0;
-                adcPower += (ival*ival) + (qval*qval);
-            }
-            double avgPower = adcPower / double(bufferedElems);
-
-            if (adcPower && ((avgPower >= adcHigh) || (avgPower <= adcLow))) {
-                grFilter[0] = 10.0 * log10(adcPower / adcTarget);
-                for (int k = 1; k < GR_FILTER_STEPS; k++) {
-                    grFilter[k] += (grFilter[0] - grFilter[k]) * 0.10;
-                }
-                newGr = grFilter[GR_FILTER_STEPS-1];
-
-                if (newGr > activeGainPref->grMax) {
-                    newGr = activeGainPref->grMax;
-                }
-            }
-//            else {
-//                SoapySDR_logf(SOAPY_SDR_DEBUG, "power: low: %f, targ: %f, high: %f, avpow: %f, adpower: %f", adcLow, adcTarget, adcHigh, avgPower, adcPower);
-//            }
-
-            // only update if change is required
-            if (newGr != oldGr) {
-                // use absolute value
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC: Gain reduction changed from %d to %d", oldGr, newGr);
-                oldLnaGr = newLnaGr = activeGainPref->grLNA;
-                err = mir_sdr_SetGr(newGr, 1, syncUpdate);
-                err = mir_sdr_SetGrParams(0, activeGainPref->grLNA);
-                oldGr = newGr;
-                grChanged = true;
-            }
-        } else if (!agcEnabled && !grChanged && (newGr != oldGr || newLnaGr != oldLnaGr)) {
-            err = mir_sdr_SetGr(newGr, 1, syncUpdate);
-            err = mir_sdr_SetGrParams(0, newLnaGr);
-            oldGr = newGr;
-            oldLnaGr = newLnaGr;
-            grChanged = true;
-        } else if (grChanged) {
-            grMisses++;
-            if (grMisses >= 10) {
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "AGC missed %d updates, giving it a kick.", grMisses);
-                mir_sdr_ResetUpdateFlags(0,1,0);
-                grMisses = 0;
-                grChanged = false;
-            }
-        }
-
+        bufferedElems = ret;
     }
 
-    int returnedElems = (numElems>bufferedElems)?bufferedElems:numElems;
+    size_t returnedElems = std::min(bufferedElems, numElems);
 
-    //convert into user's buff0
-    if (rxFloat)
+    // copy into user's buff0
+    if (useShort)
     {
-        float *ftarget = (float *)buff0;
-        for (int i = 0; i < returnedElems; i++)
-        {
-            ftarget[i*2] = ((float)xi_buffer[bufferedElemOffset+i]/32767.0);
-            ftarget[i*2+1] = ((float)xq_buffer[bufferedElemOffset+i]/32767.0);
-        }
+        std::memcpy(buff0, _currentBuff, returnedElems * 2 * sizeof(short));
     }
     else
     {
-        short *starget = (short *)buff0;
-        for (int i = 0; i < returnedElems; i++)
-        {
-            starget[i*2] = xi_buffer[bufferedElemOffset+i];
-            starget[i*2+1] = xq_buffer[bufferedElemOffset+i];
-        }
+        std::memcpy(buff0, (float *)_currentBuff, returnedElems * 2 * sizeof(float));
     }
-
-    //bump variables for next call into readStream
+    
+    // bump variables for next call into readStream
     bufferedElems -= returnedElems;
-    bufferedElemOffset += returnedElems;
+    _currentBuff += returnedElems * elementsPerSample * shortsPerWord;
 
-    //return number of elements written to buff0
-    return returnedElems;
+    // return number of elements written to buff0
+    if (bufferedElems != 0)
+    {
+        flags |= SOAPY_SDR_MORE_FRAGMENTS;
+    }
+    else
+    {
+        this->releaseReadBuffer(stream, _currentHandle);
+    }
+    return (int)returnedElems;
 }
 
-int SoapySDRPlay::getOptimalPacketsForRate(double rate_in, int sps_in) {
-    return ceil((rate_in / 30.0)/(float)sps_in);
+/*******************************************************************
+ * Direct buffer access API
+ ******************************************************************/
+
+size_t SoapySDRPlay::getNumDirectAccessBuffers(SoapySDR::Stream *stream)
+{
+    return _buffs.size();
 }
 
-void SoapySDRPlay::checkGainPref(double frequency) {
-    for (int i = 0, iMax = gainPrefs.size(); i < iMax; i++) {
-        if (frequency >= gainPrefs[i].freqMin && frequency < gainPrefs[i].freqMax) {
-            if (&gainPrefs[i] != activeGainPref) {
-                activeGainPref = &gainPrefs[i];
-                SoapySDR_logf(SOAPY_SDR_DEBUG, "Changed gain preference LO %f", activeGainPref->loFreq);
-                gainPrefChanged = true;
-            }
+int SoapySDRPlay::getDirectAccessBufferAddrs(SoapySDR::Stream *stream, const size_t handle, void **buffs)
+{
+    buffs[0] = (void *)_buffs[handle].data();
+    return 0;
+}
+
+int SoapySDRPlay::acquireReadBuffer(SoapySDR::Stream *stream,
+                                    size_t &handle,
+                                    const void **buffs,
+                                    int &flags,
+                                    long long &timeNs,
+                                    const long timeoutUs)
+{
+    std::unique_lock <std::mutex> lock(_buf_mutex);
+
+    // reset is issued by various settings
+    // overflow set in the rx callback thread
+    if (resetBuffer || _overflowEvent)
+    {
+        // drain all buffers from the fifo
+        _buf_tail = 0;
+        _buf_head = 0;
+        _buf_count = 0;
+        for (auto &buff : _buffs) buff.clear();
+        _overflowEvent = false;
+        if (resetBuffer)
+        {
+           resetBuffer = false;
+        }
+        else
+        {
+           SoapySDR_log(SOAPY_SDR_SSI, "O");
+           return SOAPY_SDR_OVERFLOW;
         }
     }
+
+    // wait for a buffer to become available
+    if (_buf_count == 0)
+    {
+        _buf_cond.wait_for(lock, std::chrono::microseconds(timeoutUs));
+        if (_buf_count == 0) 
+        {
+           return SOAPY_SDR_TIMEOUT;
+        }
+    }
+
+    // extract handle and buffer
+    handle = _buf_head;
+    buffs[0] = (void *)_buffs[handle].data();
+    flags = 0;
+
+    _buf_head = (_buf_head + 1) % numBuffers;
+
+    // return number available
+    return (int)(_buffs[handle].size() / (elementsPerSample * shortsPerWord));
 }
 
-// check whether centre frequency changed band
-bool SoapySDRPlay::freqBandChanged(double currentFreq, double newFreq) {
-	if ( getFreqBand(currentFreq) != getFreqBand(newFreq) )
-		return true;
-	else
-		return false;
+void SoapySDRPlay::releaseReadBuffer(SoapySDR::Stream *stream, const size_t handle)
+{
+    std::unique_lock <std::mutex> lock(_buf_mutex);
+    _buffs[handle].clear();
+    _buf_count--;
 }
-
-
-// returns a band number for a frequency band
-int SoapySDRPlay::getFreqBand(double frequency) {
-	if (frequency >= 10000 && frequency < 12000000) return 0;
-	else if (frequency >= 12000000 && frequency < 30000000) return 1;
-	else if (frequency >= 30000000 && frequency < 60000000) return 2;
-	else if (frequency >= 60000000 && frequency < 120000000) return 3;
-	else if (frequency >= 120000000 && frequency < 250000000) return 4;
-	else if (frequency >= 250000000 && frequency < 420000000) return 5;
-	else if (frequency >= 420000000 && frequency < 1000000000) return 6;
-	else if (frequency >= 1000000000 && frequency < 2000000000) return 7;
-	else return 8;
-}
-
