@@ -626,7 +626,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfGainArg.value = "1";
        RfGainArg.name = "RF Gain Select";
        RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::INT;
+       RfGainArg.type = SoapySDR::ArgInfo::STRING;
        RfGainArg.options.push_back("0");
        RfGainArg.options.push_back("1");
        RfGainArg.options.push_back("2");
