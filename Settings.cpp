@@ -30,17 +30,17 @@ extern bool deviceSelected;    // global declared in Registration.cpp
 
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
-    std::string strargs = SoapySDR::KwargsToString(args);
+    std::string label = args.at("label");
 
-    size_t posidx = strargs.find("SDRplay Dev");
+    size_t posidx = label.find("SDRplay Dev");
     if (posidx == std::string::npos)
     {
         SoapySDR_logf(SOAPY_SDR_WARNING, "Can't find Dev string in args");
         return;
     }
-    unsigned int devIdx = strargs.at(posidx + 11) - 0x30;
-    hwVer = strargs.at(posidx + 16) - 0x30;
-    serNo = strargs.substr(posidx + 16, 20);
+    unsigned int devIdx = label.at(posidx + 11) - 0x30;
+    hwVer = label.at(posidx + 16) - 0x30;
+    serNo = label.substr(posidx + 16, 20);
     size_t poscom = serNo.find(",");
     if (poscom != std::string::npos)
     {

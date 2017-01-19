@@ -37,7 +37,8 @@ bool deviceSelected = false;
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
    std::vector<SoapySDR::Kwargs> results;
-   std::string strargs = SoapySDR::KwargsToString(args);
+   std::string labelHint;
+   if (args.count("label") != 0) labelHint = args.at("label");
    unsigned int nDevs = 0;
    char lblstr[128];
 
@@ -49,10 +50,10 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    mir_sdr_DebugEnable(1);
    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
-   size_t posidx = strargs.find("SDRplay Dev");
+   size_t posidx = labelHint.find("SDRplay Dev");
    if (posidx != std::string::npos)
    {
-      unsigned int devIdx = strargs.at(posidx + 11) - 0x30;
+      unsigned int devIdx = labelHint.at(posidx + 11) - 0x30;
       if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail))
       {
          SoapySDR::Kwargs dev;
