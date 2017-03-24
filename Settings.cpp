@@ -473,7 +473,11 @@ std::vector<double> SoapySDRPlay::listBandwidths(const int direction, const size
 SoapySDR::RangeList SoapySDRPlay::getBandwidthRange(const int direction, const size_t channel) const
 {
    SoapySDR::RangeList results;
-
+   //call into the older deprecated listBandwidths() call
+   for (auto &bw : this->listBandwidths(direction, channel))
+   {
+     ranges.push_back(SoapySDR::Range(bw, bw));
+   }
    return results;
 }
 
