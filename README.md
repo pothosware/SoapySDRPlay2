@@ -1,8 +1,13 @@
 # Soapy SDR module for SDRPlay
 
-##Documentation
+## Documentation
 
 * https://github.com/pothosware/SoapySDRPlay/wiki
+
+## Dependencies
+
+* Get SDR Play driver binaries from - http://sdrplay.com/
+* SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
 ## Licensing information
 
