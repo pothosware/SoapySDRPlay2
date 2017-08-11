@@ -779,7 +779,14 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    {
       if (value == "AntA/AntB") amPort = 0;
       else                      amPort = 1;
+
       mir_sdr_AmPortSelect(amPort);
+       
+      if (streamActive) {
+          mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
+      }
+      //We apparently need to re-apply the current ant_sel
+      mir_sdr_RSPII_AntennaControl(antSel);
    }
    else if (key == "extref_ctrl")
    {
