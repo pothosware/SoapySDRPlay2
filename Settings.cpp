@@ -779,7 +779,20 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    {
       if (value == "AntA/AntB") amPort = 0;
       else                      amPort = 1;
+
       mir_sdr_AmPortSelect(amPort);
+
+      //If Port A/B (amPort == 0) is requested
+      //call the ant_sel to set the choice between A and B again, as advised by SDRPlay Support. 
+      if (amPort == 0) {
+          mir_sdr_RSPII_AntennaControl(antSel);
+      }
+      
+      //Required : call Reinit as Specs and SDRPlay Support advised,
+      //after the previous 2 API calls has been made (which can be made in any order)
+      if (streamActive) {
+          mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
+      }
    }
    else if (key == "extref_ctrl")
    {
