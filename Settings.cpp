@@ -22,8 +22,6 @@
  * THE SOFTWARE.
  */
 
-#define RF_GAIN_IN_MENU
-
 #include "SoapySDRPlay.hpp"
 
 extern bool deviceSelected;    // global declared in Registration.cpp
@@ -146,18 +144,89 @@ size_t SoapySDRPlay::getNumChannels(const int dir) const
 std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const size_t channel) const
 {
     std::vector<std::string> antennas;
-    antennas.push_back("RX");
+    
+    if (hwVer == 1) {
+        antennas.push_back("RX");
+    }
+    else {
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
+        antennas.push_back("Antenna A");
+        antennas.push_back("Antenna B");
+        antennas.push_back("Hi-Z");
+#else
+        antennas.push_back("RX");
+#endif  
+    }
+
     return antennas;
 }
 
 void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const std::string &name)
 {
-    // TODO
+    // Check direction
+    if ((direction != SOAPY_SDR_RX) || (hwVer == 1)) {
+        return;       
+    }
+
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
+    bool changeToAntennaA_B = false;
+
+    if (name == "Antenna A") {
+        antSel = mir_sdr_RSPII_ANTENNA_A;
+        changeToAntennaA_B = true;
+    }
+    else if (name == "Antenna B") {
+        antSel = mir_sdr_RSPII_ANTENNA_B;
+        changeToAntennaA_B = true;
+    }
+    else if (name == "Hi-Z") {
+        amPort = 1;
+        mir_sdr_AmPortSelect(amPort);
+
+        if (streamActive) {
+            mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
+        }
+    }
+
+    if (changeToAntennaA_B) {
+        
+        //if we are currently High_Z, make the switch first.
+        if (amPort == 1) {
+            amPort = 0;
+            mir_sdr_AmPortSelect(amPort);
+            
+            mir_sdr_RSPII_AntennaControl(antSel);
+
+            if (streamActive) {
+                mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
+            }
+        }
+        else {
+            mir_sdr_RSPII_AntennaControl(antSel);
+        }
+    }
+#endif
 }
 
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
 {
-    return "RX";
+    if (hwVer == 1) {
+        return "RX";    
+    }
+    else {
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
+        if (amPort == 1) {
+            return "Hi-Z";
+        }
+        else if (antSel == mir_sdr_RSPII_ANTENNA_A) {
+            return "Antenna A";
+        }
+        else {
+            return "Antenna B";  
+        }
+#endif
+        return "RX";
+    }
 }
 
 /*******************************************************************
@@ -670,6 +739,8 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 
     if (hwVer == 2)
     {
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
+
        SoapySDR::ArgInfo AntCtrlArg;
        AntCtrlArg.key = "ant_sel";
        AntCtrlArg.value = "Antenna A";
@@ -689,6 +760,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        AmPortArg.options.push_back("AntA/AntB");
        AmPortArg.options.push_back("Hi-Z");
        setArgs.push_back(AmPortArg);
+#endif
 
        SoapySDR::ArgInfo ExtRefArg;
        ExtRefArg.key = "extref_ctrl";
@@ -769,6 +841,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       setPoint = stoi(value);
       mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
    }
+
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
    else if (key == "ant_sel")
    {
       if (value == "Antenna A") antSel = mir_sdr_RSPII_ANTENNA_A;
@@ -794,6 +868,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
           mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
       }
    }
+#endif
+
    else if (key == "extref_ctrl")
    {
       if (value == "false") extRef = 0;
@@ -844,6 +920,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     {
        return std::to_string(setPoint);
     }
+#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
     else if (key == "ant_sel")
     {
        if (antSel == mir_sdr_RSPII_ANTENNA_A) return "Antenna A";
@@ -854,6 +931,7 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        if (amPort == 0) return "AntA/AntB";
        else             return "Hi-Z";
     }
+#endif
     else if (key == "extref_ctrl")
     {
        if (extRef == 0) return "false";
