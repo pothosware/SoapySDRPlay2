@@ -245,6 +245,7 @@ private:
     float ver;
 
     int gRdB;
+    std::atomic_int current_gRdB;
     int gRdBsystem;
     int sps;
     int lnaState;

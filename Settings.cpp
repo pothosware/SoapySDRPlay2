@@ -144,7 +144,6 @@ size_t SoapySDRPlay::getNumChannels(const int dir) const
 std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const size_t channel) const
 {
     std::vector<std::string> antennas;
-    
     if (hwVer == 1) {
         antennas.push_back("RX");
     }
@@ -157,7 +156,6 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
         antennas.push_back("RX");
 #endif  
     }
-
     return antennas;
 }
 
@@ -211,8 +209,8 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
 {
     if (hwVer == 1) {
-        return "RX";    
-    }
+    return "RX";
+}
     else {
 #ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         if (amPort == 1) {
@@ -282,7 +280,12 @@ bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
 void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
 {
     agcMode = mir_sdr_AGC_DISABLE;
-    if (automatic == true)  agcMode = mir_sdr_AGC_100HZ;
+
+    if (automatic == true) {
+        agcMode = mir_sdr_AGC_100HZ;
+        //align known agc values with current value before starting AGC.
+        current_gRdB = gRdB;
+    }
     mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
 }
 
@@ -297,19 +300,23 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    if (name == "IFGR")
    {
-      if (gRdB != (int)value)
+      //Depending of the previously used AGC context, the real applied 
+      // gain may be either gRdB or current_gRdB, so apply the change if required value is different 
+      //from one of them.
+      if ((gRdB != (int)value) || (current_gRdB != (int)value))
       {
          gRdB = (int)value;
+         current_gRdB = (int)value;
          doUpdate = true;
       }
    }
 #ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
    {
-      if (lnaState != (int)value)
-      {
-         lnaState = (int)value;
-         doUpdate = true;
+      if (lnaState != (int)value) {
+
+          lnaState = (int)value;
+          doUpdate = true;
       }
    }
 #endif
@@ -323,7 +330,7 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 {
    if (name == "IFGR")
    {
-      return gRdB;
+       return current_gRdB;
    }
 #ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
@@ -740,7 +747,6 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
     if (hwVer == 2)
     {
 #ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-
        SoapySDR::ArgInfo AntCtrlArg;
        AntCtrlArg.key = "ant_sel";
        AntCtrlArg.value = "Antenna A";
@@ -841,7 +847,6 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       setPoint = stoi(value);
       mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
    }
-
 #ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
    else if (key == "ant_sel")
    {
@@ -869,7 +874,6 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       }
    }
 #endif
-
    else if (key == "extref_ctrl")
    {
       if (value == "false") extRef = 0;

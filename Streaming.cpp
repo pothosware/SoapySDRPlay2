@@ -118,7 +118,8 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples)
 
 void SoapySDRPlay::gr_callback(unsigned int gRdB, unsigned int lnaGRdB)
 {
-    return;
+    current_gRdB = gRdB;
+    //Beware, lnaGRdB is really the LNA GR, NOT the LNA state !
 }
 
 /*******************************************************************
