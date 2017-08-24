@@ -47,7 +47,10 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
       mir_sdr_ReleaseDeviceIdx();
       deviceSelected = false;
    }
-   mir_sdr_DebugEnable(1);
+   //Enable (= 1) API calls tracing,
+   //but only for debug purposes due to its performance impact. 
+   mir_sdr_DebugEnable(0);
+
    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
    size_t posidx = labelHint.find("SDRplay Dev");
