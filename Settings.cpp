@@ -144,6 +144,11 @@ size_t SoapySDRPlay::getNumChannels(const int dir) const
 std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const size_t channel) const
 {
     std::vector<std::string> antennas;
+
+    if (direction == SOAPY_SDR_TX) {
+        return antennas;
+    }
+
     if (hwVer == 1) {
         antennas.push_back("RX");
     }
@@ -208,9 +213,13 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
 
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
 {
+    if (direction == SOAPY_SDR_TX) {
+        return "";
+    }
+
     if (hwVer == 1) {
-    return "RX";
-}
+        return "RX";
+    }
     else {
 #ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         if (amPort == 1) {
