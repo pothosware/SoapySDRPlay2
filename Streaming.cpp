@@ -118,7 +118,8 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples)
 
 void SoapySDRPlay::gr_callback(unsigned int gRdB, unsigned int lnaGRdB)
 {
-    return;
+    current_gRdB = gRdB;
+    //Beware, lnaGRdB is really the LNA GR, NOT the LNA state !
 }
 
 /*******************************************************************
@@ -200,7 +201,7 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     
     mir_sdr_ErrT err;
     
-    mir_sdr_DebugEnable(1);
+    mir_sdr_DebugEnable(0);
 
     err = mir_sdr_StreamInit(&gRdB, sampleRate / 1e6, centerFrequency / 1e6, bwMode,
                              ifMode, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps,

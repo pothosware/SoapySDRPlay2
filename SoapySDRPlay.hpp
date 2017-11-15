@@ -245,10 +245,11 @@ private:
     float ver;
 
     int gRdB;
+    std::atomic_int current_gRdB;
     int gRdBsystem;
     int sps;
     int lnaState;
-    unsigned char hwVer;
+    int hwVer;
 
     //cached settings
     uint32_t sampleRate;
@@ -274,7 +275,8 @@ private:
     int amPort;
     unsigned int extRef;
     unsigned int biasTen;
-    unsigned int notechEn;
+    unsigned int notchEn;
+    unsigned int dabNotchEn;
     std::string serNo;
 
 public:
