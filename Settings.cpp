@@ -63,7 +63,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     ifMode = mir_sdr_IF_Zero;
     bwMode = mir_sdr_BW_1_536;
     gRdB = 40;
-    lnaState = (hwVer == 2)? 4: 1;
+    lnaState = (hwVer == 2 || hwVer > 253)? 4: 1;
 
     numBuffers = DEFAULT_NUM_BUFFERS;
     bufferElems = DEFAULT_BUFFER_LENGTH;
@@ -81,7 +81,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     amPort = 0;
     extRef = 0;
     biasTen = 0;
-    notechEn = 0;
+    notchEn = 0;
+    dabNotchEn = 0;
 
     bufferedElems = 0;
     _currentBuff = 0;
@@ -149,7 +150,7 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
         return antennas;
     }
 
-    if (hwVer == 1) {
+    if (hwVer == 1 || hwVer > 253) {
         antennas.push_back("RX");
     }
     else {
@@ -167,7 +168,7 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
 void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const std::string &name)
 {
     // Check direction
-    if ((direction != SOAPY_SDR_RX) || (hwVer == 1)) {
+    if ((direction != SOAPY_SDR_RX) || (hwVer == 1) || (hwVer > 253)) {
         return;       
     }
 
@@ -217,7 +218,7 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         return "";
     }
 
-    if (hwVer == 1) {
+    if (hwVer == 1  || (hwVer > 253)) {
         return "RX";
     }
     else {
@@ -362,9 +363,13 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(0, 3);
    }
-   else //if ((name == "RFGR") && (hwVer == 2))
+   else if ((name == "RFGR") && (hwVer == 2))
    {
       return SoapySDR::Range(0, 8);
+   }
+   else if ((name == "RFGR") && (hwVer > 253))
+   {
+      return SoapySDR::Range(0, 9);
    }
 #endif
     return SoapySDR::Range(20, 59);
@@ -708,6 +713,26 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfGainArg.options.push_back("8");
        setArgs.push_back(RfGainArg);
     }
+    else if (hwVer > 253)
+    {
+       SoapySDR::ArgInfo RfGainArg;
+       RfGainArg.key = "rfgain_sel";
+       RfGainArg.value = "4";
+       RfGainArg.name = "RF Gain Select";
+       RfGainArg.description = "RF Gain Select";
+       RfGainArg.type = SoapySDR::ArgInfo::STRING;
+       RfGainArg.options.push_back("0");
+       RfGainArg.options.push_back("1");
+       RfGainArg.options.push_back("2");
+       RfGainArg.options.push_back("3");
+       RfGainArg.options.push_back("4");
+       RfGainArg.options.push_back("5");
+       RfGainArg.options.push_back("6");
+       RfGainArg.options.push_back("7");
+       RfGainArg.options.push_back("8");
+       RfGainArg.options.push_back("9");
+       setArgs.push_back(RfGainArg);
+    }
     else
     {
        SoapySDR::ArgInfo RfGainArg;
@@ -801,6 +826,32 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
        setArgs.push_back(RfNotchArg);
     }
+    else if (hwVer > 253)
+    {
+       SoapySDR::ArgInfo BiasTArg;
+       BiasTArg.key = "biasT_ctrl";
+       BiasTArg.value = "true";
+       BiasTArg.name = "BiasT Enable";
+       BiasTArg.description = "BiasT Control";
+       BiasTArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(BiasTArg);
+
+       SoapySDR::ArgInfo RfNotchArg;
+       RfNotchArg.key = "rfnotch_ctrl";
+       RfNotchArg.value = "true";
+       RfNotchArg.name = "RfNotch Enable";
+       RfNotchArg.description = "RF Notch Filter Control";
+       RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(RfNotchArg);
+
+       SoapySDR::ArgInfo DabNotchArg;
+       DabNotchArg.key = "dabnotch_ctrl";
+       DabNotchArg.value = "true";
+       DabNotchArg.name = "DabNotch Enable";
+       DabNotchArg.description = "DAB Notch Filter Control";
+       DabNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(DabNotchArg);
+    }
 
     return setArgs;
 }
@@ -818,7 +869,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       else if (value == "5") lnaState = 5;
       else if (value == "6") lnaState = 6;
       else if (value == "7") lnaState = 7;
-      else                   lnaState = 8;
+      else if (value == "8") lnaState = 8;
+      else                   lnaState = 9;
       if (agcMode != mir_sdr_AGC_DISABLE)
       {
          mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
@@ -893,13 +945,21 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    {
       if (value == "false") biasTen = 0;
       else                  biasTen = 1;
-      mir_sdr_RSPII_BiasTControl(biasTen);
+      if (hwVer == 2) mir_sdr_RSPII_BiasTControl(biasTen);
+      if (hwVer > 253) mir_sdr_rsp1a_BiasT(biasTen);
    }
    else if (key == "rfnotch_ctrl")
    {
-      if (value == "false") notechEn = 0;
-      else                  notechEn = 1;
-      mir_sdr_RSPII_RfNotchEnable(notechEn);
+      if (value == "false") notchEn = 0;
+      else                  notchEn = 1;
+      if (hwVer == 2) mir_sdr_RSPII_RfNotchEnable(notchEn);
+      if (hwVer > 253) mir_sdr_rsp1a_BroadcastNotch(notchEn);
+   }
+   else if (key == "dabnotch_ctrl")
+   {
+      if (value == "false") dabNotchEn = 0;
+      else                  dabNotchEn = 1;
+      if (hwVer > 253) mir_sdr_rsp1a_DabNotch(dabNotchEn);
    }
 }
 
@@ -916,7 +976,8 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        else if (lnaState == 5) return "5";
        else if (lnaState == 6) return "6";
        else if (lnaState == 7) return "7";
-       else                    return "8";
+       else if (lnaState == 8) return "8";
+       else                    return "9";
     }
     else
 #endif
@@ -957,8 +1018,13 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else if (key == "rfnotch_ctrl")
     {
-       if (notechEn == 0) return "false";
-       else               return "true";
+       if (notchEn == 0) return "false";
+       else              return "true";
+    }
+    else if (key == "dabnotch_ctrl")
+    {
+       if (dabNotchEn == 0) return "false";
+       else                 return "true";
     }
 
     // SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());
