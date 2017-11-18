@@ -289,9 +289,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     std::vector<std::string> results;
 
     results.push_back("IFGR");
-#ifndef RF_GAIN_IN_MENU
     results.push_back("RFGR");
-#endif
 
     return results;
 }
@@ -334,7 +332,6 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
          doUpdate = true;
       }
    }
-#ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
    {
       if (lnaState != (int)value) {
@@ -343,7 +340,6 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
           doUpdate = true;
       }
    }
-#endif
    if ((doUpdate == true) && (streamActive))
    {
       mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_GR);
@@ -356,14 +352,12 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    {
        return current_gRdB;
    }
-#ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
    {
       return lnaState;
    }
-#endif
 
-    return 0;
+   return 0;
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
@@ -372,7 +366,6 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(20, 59);
    }
-#ifndef RF_GAIN_IN_MENU
    else if ((name == "RFGR") && (hwVer == 1))
    {
       return SoapySDR::Range(0, 3);
@@ -385,7 +378,6 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(0, 9);
    }
-#endif
     return SoapySDR::Range(20, 59);
 }
 

@@ -39,7 +39,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 # Configurable feature set 
-SET (RF_GAIN_IN_MENU OFF CACHE BOOL "Use Rf gain as setting, else like a IFGR gain control")
+SET (RF_GAIN_IN_MENU ON CACHE BOOL "Add Rf gain as a setting, additionally to the IFGR gain control")
 
 IF(RF_GAIN_IN_MENU) 
     ADD_DEFINITIONS( -DRF_GAIN_IN_MENU=1 )
