@@ -26,24 +26,47 @@
 
 extern bool deviceSelected;    // global declared in Registration.cpp
 
+#define MAX_RSP_DEVICES  (4)
+
+static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
+
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
     std::string label = args.at("label");
 
-    size_t posidx = label.find("SDRplay Dev");
+	std::string baseLabel = "SDRplay Dev";
+
+    size_t posidx = label.find(baseLabel);
+
     if (posidx == std::string::npos)
     {
         SoapySDR_logf(SOAPY_SDR_WARNING, "Can't find Dev string in args");
         return;
     }
-    unsigned int devIdx = label.at(posidx + 11) - 0x30;
-    hwVer = label.at(posidx + 16) - 0x30;
-    serNo = label.substr(posidx + 16, 20);
-    size_t poscom = serNo.find(",");
-    if (poscom != std::string::npos)
-    {
-       serNo = serNo.substr(0, poscom);
-    }
+	//retreive device index
+    unsigned int devIdx = label.at(posidx + baseLabel.length()) - 0x30;
+
+	// retreive hwVer and serNo by API
+	unsigned int nDevs = 0;
+
+	mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
+
+	if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail)) {
+
+		hwVer = rspDevs[devIdx].hwVer;
+		serNo = rspDevs[devIdx].SerNo;
+
+		size_t poscom = serNo.find(",");
+
+		if (poscom != std::string::npos)
+		{
+			serNo = serNo.substr(0, poscom);
+		}
+	}
+	else {
+		SoapySDR_logf(SOAPY_SDR_WARNING, "Can't determine hwVer/serNo");
+		return;
+	}
 
     mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)

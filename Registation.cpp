@@ -51,12 +51,17 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    //but only for debug purposes due to its performance impact. 
    mir_sdr_DebugEnable(0);
 
+   std::string baseLabel = "SDRplay Dev";
+
+	// list devices by API
    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
-   size_t posidx = labelHint.find("SDRplay Dev");
+   size_t posidx = labelHint.find(baseLabel);
+
    if (posidx != std::string::npos)
    {
-      unsigned int devIdx = labelHint.at(posidx + 11) - 0x30;
+      unsigned int devIdx = labelHint.at(posidx + baseLabel.length()) - 0x30;
+
       if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail))
       {
          SoapySDR::Kwargs dev;
