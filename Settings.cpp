@@ -177,13 +177,9 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
         antennas.push_back("RX");
     }
     else {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         antennas.push_back("Antenna A");
         antennas.push_back("Antenna B");
         antennas.push_back("Hi-Z");
-#else
-        antennas.push_back("RX");
-#endif  
     }
     return antennas;
 }
@@ -195,7 +191,6 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
         return;       
     }
 
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
     bool changeToAntennaA_B = false;
 
     if (name == "Antenna A") {
@@ -232,7 +227,6 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
             mir_sdr_RSPII_AntennaControl(antSel);
         }
     }
-#endif
 }
 
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
@@ -245,7 +239,6 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         return "RX";
     }
     else {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         if (amPort == 1) {
             return "Hi-Z";
         }
@@ -255,8 +248,6 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         else {
             return "Antenna B";  
         }
-#endif
-        return "RX";
     }
 }
 
@@ -803,28 +794,6 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 
     if (hwVer == 2)
     {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-       SoapySDR::ArgInfo AntCtrlArg;
-       AntCtrlArg.key = "ant_sel";
-       AntCtrlArg.value = "Antenna A";
-       AntCtrlArg.name = "Antenna Select";
-       AntCtrlArg.description = "Antenna Select";
-       AntCtrlArg.type = SoapySDR::ArgInfo::STRING;
-       AntCtrlArg.options.push_back("Antenna A");
-       AntCtrlArg.options.push_back("Antenna B");
-       setArgs.push_back(AntCtrlArg);
-
-       SoapySDR::ArgInfo AmPortArg;
-       AmPortArg.key = "amport_ctrl";
-       AmPortArg.value = "AntA//AntB";
-       AmPortArg.name = "AMport Select";
-       AmPortArg.description = "AM Port Select";
-       AmPortArg.type = SoapySDR::ArgInfo::STRING;
-       AmPortArg.options.push_back("AntA/AntB");
-       AmPortArg.options.push_back("Hi-Z");
-       setArgs.push_back(AmPortArg);
-#endif
-
        SoapySDR::ArgInfo ExtRefArg;
        ExtRefArg.key = "extref_ctrl";
        ExtRefArg.value = "true";
@@ -931,33 +900,6 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       setPoint = stoi(value);
       mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
    }
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-   else if (key == "ant_sel")
-   {
-      if (value == "Antenna A") antSel = mir_sdr_RSPII_ANTENNA_A;
-      else                      antSel = mir_sdr_RSPII_ANTENNA_B;
-      mir_sdr_RSPII_AntennaControl(antSel);
-   }
-   else if (key == "amport_ctrl")
-   {
-      if (value == "AntA/AntB") amPort = 0;
-      else                      amPort = 1;
-
-      mir_sdr_AmPortSelect(amPort);
-
-      //If Port A/B (amPort == 0) is requested
-      //call the ant_sel to set the choice between A and B again, as advised by SDRPlay Support. 
-      if (amPort == 0) {
-          mir_sdr_RSPII_AntennaControl(antSel);
-      }
-      
-      //Required : call Reinit as Specs and SDRPlay Support advised,
-      //after the previous 2 API calls has been made (which can be made in any order)
-      if (streamActive) {
-          mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
-      }
-   }
-#endif
    else if (key == "extref_ctrl")
    {
       if (value == "false") extRef = 0;
@@ -1017,18 +959,6 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     {
        return std::to_string(setPoint);
     }
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-    else if (key == "ant_sel")
-    {
-       if (antSel == mir_sdr_RSPII_ANTENNA_A) return "Antenna A";
-       else                                   return "Antenna B";
-    }
-    else if (key == "amport_ctrl")
-    {
-       if (amPort == 0) return "AntA/AntB";
-       else             return "Hi-Z";
-    }
-#endif
     else if (key == "extref_ctrl")
     {
        if (extRef == 0) return "false";
