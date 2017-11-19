@@ -249,7 +249,7 @@ private:
     int gRdBsystem;
     int sps;
     int lnaState;
-    unsigned char hwVer;
+    int hwVer;
 
     //cached settings
     uint32_t sampleRate;
@@ -275,7 +275,8 @@ private:
     int amPort;
     unsigned int extRef;
     unsigned int biasTen;
-    unsigned int notechEn;
+    unsigned int notchEn;
+    unsigned int dabNotchEn;
     std::string serNo;
 
 public:

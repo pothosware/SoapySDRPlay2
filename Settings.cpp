@@ -26,24 +26,47 @@
 
 extern bool deviceSelected;    // global declared in Registration.cpp
 
+#define MAX_RSP_DEVICES  (4)
+
+static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
+
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
     std::string label = args.at("label");
 
-    size_t posidx = label.find("SDRplay Dev");
+	std::string baseLabel = "SDRplay Dev";
+
+    size_t posidx = label.find(baseLabel);
+
     if (posidx == std::string::npos)
     {
         SoapySDR_logf(SOAPY_SDR_WARNING, "Can't find Dev string in args");
         return;
     }
-    unsigned int devIdx = label.at(posidx + 11) - 0x30;
-    hwVer = label.at(posidx + 16) - 0x30;
-    serNo = label.substr(posidx + 16, 20);
-    size_t poscom = serNo.find(",");
-    if (poscom != std::string::npos)
-    {
-       serNo = serNo.substr(0, poscom);
-    }
+	//retreive device index
+    unsigned int devIdx = label.at(posidx + baseLabel.length()) - 0x30;
+
+	// retreive hwVer and serNo by API
+	unsigned int nDevs = 0;
+
+	mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
+
+	if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail)) {
+
+		hwVer = rspDevs[devIdx].hwVer;
+		serNo = rspDevs[devIdx].SerNo;
+
+		size_t poscom = serNo.find(",");
+
+		if (poscom != std::string::npos)
+		{
+			serNo = serNo.substr(0, poscom);
+		}
+	}
+	else {
+		SoapySDR_logf(SOAPY_SDR_WARNING, "Can't determine hwVer/serNo");
+		return;
+	}
 
     mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)
@@ -63,7 +86,7 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     ifMode = mir_sdr_IF_Zero;
     bwMode = mir_sdr_BW_1_536;
     gRdB = 40;
-    lnaState = (hwVer == 2)? 4: 1;
+    lnaState = (hwVer == 2 || hwVer > 253)? 4: 1;
 
     numBuffers = DEFAULT_NUM_BUFFERS;
     bufferElems = DEFAULT_BUFFER_LENGTH;
@@ -81,7 +104,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     amPort = 0;
     extRef = 0;
     biasTen = 0;
-    notechEn = 0;
+    notchEn = 0;
+    dabNotchEn = 0;
 
     bufferedElems = 0;
     _currentBuff = 0;
@@ -149,17 +173,13 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
         return antennas;
     }
 
-    if (hwVer == 1) {
+    if (hwVer == 1 || hwVer > 253) {
         antennas.push_back("RX");
     }
     else {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         antennas.push_back("Antenna A");
         antennas.push_back("Antenna B");
         antennas.push_back("Hi-Z");
-#else
-        antennas.push_back("RX");
-#endif  
     }
     return antennas;
 }
@@ -167,11 +187,10 @@ std::vector<std::string> SoapySDRPlay::listAntennas(const int direction, const s
 void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const std::string &name)
 {
     // Check direction
-    if ((direction != SOAPY_SDR_RX) || (hwVer == 1)) {
+    if ((direction != SOAPY_SDR_RX) || (hwVer == 1) || (hwVer > 253)) {
         return;       
     }
 
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
     bool changeToAntennaA_B = false;
 
     if (name == "Antenna A") {
@@ -208,7 +227,6 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
             mir_sdr_RSPII_AntennaControl(antSel);
         }
     }
-#endif
 }
 
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
@@ -217,11 +235,10 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         return "";
     }
 
-    if (hwVer == 1) {
+    if (hwVer == 1  || (hwVer > 253)) {
         return "RX";
     }
     else {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS
         if (amPort == 1) {
             return "Hi-Z";
         }
@@ -231,8 +248,6 @@ std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) 
         else {
             return "Antenna B";  
         }
-#endif
-        return "RX";
     }
 }
 
@@ -274,9 +289,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     std::vector<std::string> results;
 
     results.push_back("IFGR");
-#ifndef RF_GAIN_IN_MENU
     results.push_back("RFGR");
-#endif
 
     return results;
 }
@@ -319,7 +332,6 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
          doUpdate = true;
       }
    }
-#ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
    {
       if (lnaState != (int)value) {
@@ -328,7 +340,6 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
           doUpdate = true;
       }
    }
-#endif
    if ((doUpdate == true) && (streamActive))
    {
       mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_GR);
@@ -341,14 +352,12 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
    {
        return current_gRdB;
    }
-#ifndef RF_GAIN_IN_MENU
    else if (name == "RFGR")
    {
       return lnaState;
    }
-#endif
 
-    return 0;
+   return 0;
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
@@ -357,16 +366,18 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(20, 59);
    }
-#ifndef RF_GAIN_IN_MENU
    else if ((name == "RFGR") && (hwVer == 1))
    {
       return SoapySDR::Range(0, 3);
    }
-   else //if ((name == "RFGR") && (hwVer == 2))
+   else if ((name == "RFGR") && (hwVer == 2))
    {
       return SoapySDR::Range(0, 8);
    }
-#endif
+   else if ((name == "RFGR") && (hwVer > 253))
+   {
+      return SoapySDR::Range(0, 9);
+   }
     return SoapySDR::Range(20, 59);
 }
 
@@ -708,6 +719,26 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfGainArg.options.push_back("8");
        setArgs.push_back(RfGainArg);
     }
+    else if (hwVer > 253)
+    {
+       SoapySDR::ArgInfo RfGainArg;
+       RfGainArg.key = "rfgain_sel";
+       RfGainArg.value = "4";
+       RfGainArg.name = "RF Gain Select";
+       RfGainArg.description = "RF Gain Select";
+       RfGainArg.type = SoapySDR::ArgInfo::STRING;
+       RfGainArg.options.push_back("0");
+       RfGainArg.options.push_back("1");
+       RfGainArg.options.push_back("2");
+       RfGainArg.options.push_back("3");
+       RfGainArg.options.push_back("4");
+       RfGainArg.options.push_back("5");
+       RfGainArg.options.push_back("6");
+       RfGainArg.options.push_back("7");
+       RfGainArg.options.push_back("8");
+       RfGainArg.options.push_back("9");
+       setArgs.push_back(RfGainArg);
+    }
     else
     {
        SoapySDR::ArgInfo RfGainArg;
@@ -755,28 +786,6 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 
     if (hwVer == 2)
     {
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-       SoapySDR::ArgInfo AntCtrlArg;
-       AntCtrlArg.key = "ant_sel";
-       AntCtrlArg.value = "Antenna A";
-       AntCtrlArg.name = "Antenna Select";
-       AntCtrlArg.description = "Antenna Select";
-       AntCtrlArg.type = SoapySDR::ArgInfo::STRING;
-       AntCtrlArg.options.push_back("Antenna A");
-       AntCtrlArg.options.push_back("Antenna B");
-       setArgs.push_back(AntCtrlArg);
-
-       SoapySDR::ArgInfo AmPortArg;
-       AmPortArg.key = "amport_ctrl";
-       AmPortArg.value = "AntA//AntB";
-       AmPortArg.name = "AMport Select";
-       AmPortArg.description = "AM Port Select";
-       AmPortArg.type = SoapySDR::ArgInfo::STRING;
-       AmPortArg.options.push_back("AntA/AntB");
-       AmPortArg.options.push_back("Hi-Z");
-       setArgs.push_back(AmPortArg);
-#endif
-
        SoapySDR::ArgInfo ExtRefArg;
        ExtRefArg.key = "extref_ctrl";
        ExtRefArg.value = "true";
@@ -801,6 +810,32 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
        RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
        setArgs.push_back(RfNotchArg);
     }
+    else if (hwVer > 253)
+    {
+       SoapySDR::ArgInfo BiasTArg;
+       BiasTArg.key = "biasT_ctrl";
+       BiasTArg.value = "true";
+       BiasTArg.name = "BiasT Enable";
+       BiasTArg.description = "BiasT Control";
+       BiasTArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(BiasTArg);
+
+       SoapySDR::ArgInfo RfNotchArg;
+       RfNotchArg.key = "rfnotch_ctrl";
+       RfNotchArg.value = "true";
+       RfNotchArg.name = "RfNotch Enable";
+       RfNotchArg.description = "RF Notch Filter Control";
+       RfNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(RfNotchArg);
+
+       SoapySDR::ArgInfo DabNotchArg;
+       DabNotchArg.key = "dabnotch_ctrl";
+       DabNotchArg.value = "true";
+       DabNotchArg.name = "DabNotch Enable";
+       DabNotchArg.description = "DAB Notch Filter Control";
+       DabNotchArg.type = SoapySDR::ArgInfo::BOOL;
+       setArgs.push_back(DabNotchArg);
+    }
 
     return setArgs;
 }
@@ -818,7 +853,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       else if (value == "5") lnaState = 5;
       else if (value == "6") lnaState = 6;
       else if (value == "7") lnaState = 7;
-      else                   lnaState = 8;
+      else if (value == "8") lnaState = 8;
+      else                   lnaState = 9;
       if (agcMode != mir_sdr_AGC_DISABLE)
       {
          mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
@@ -856,33 +892,6 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
       setPoint = stoi(value);
       mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
    }
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-   else if (key == "ant_sel")
-   {
-      if (value == "Antenna A") antSel = mir_sdr_RSPII_ANTENNA_A;
-      else                      antSel = mir_sdr_RSPII_ANTENNA_B;
-      mir_sdr_RSPII_AntennaControl(antSel);
-   }
-   else if (key == "amport_ctrl")
-   {
-      if (value == "AntA/AntB") amPort = 0;
-      else                      amPort = 1;
-
-      mir_sdr_AmPortSelect(amPort);
-
-      //If Port A/B (amPort == 0) is requested
-      //call the ant_sel to set the choice between A and B again, as advised by SDRPlay Support. 
-      if (amPort == 0) {
-          mir_sdr_RSPII_AntennaControl(antSel);
-      }
-      
-      //Required : call Reinit as Specs and SDRPlay Support advised,
-      //after the previous 2 API calls has been made (which can be made in any order)
-      if (streamActive) {
-          mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_AM_PORT);
-      }
-   }
-#endif
    else if (key == "extref_ctrl")
    {
       if (value == "false") extRef = 0;
@@ -893,13 +902,21 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
    {
       if (value == "false") biasTen = 0;
       else                  biasTen = 1;
-      mir_sdr_RSPII_BiasTControl(biasTen);
+      if (hwVer == 2) mir_sdr_RSPII_BiasTControl(biasTen);
+      if (hwVer > 253) mir_sdr_rsp1a_BiasT(biasTen);
    }
    else if (key == "rfnotch_ctrl")
    {
-      if (value == "false") notechEn = 0;
-      else                  notechEn = 1;
-      mir_sdr_RSPII_RfNotchEnable(notechEn);
+      if (value == "false") notchEn = 0;
+      else                  notchEn = 1;
+      if (hwVer == 2) mir_sdr_RSPII_RfNotchEnable(notchEn);
+      if (hwVer > 253) mir_sdr_rsp1a_BroadcastNotch(notchEn);
+   }
+   else if (key == "dabnotch_ctrl")
+   {
+      if (value == "false") dabNotchEn = 0;
+      else                  dabNotchEn = 1;
+      if (hwVer > 253) mir_sdr_rsp1a_DabNotch(dabNotchEn);
    }
 }
 
@@ -916,7 +933,8 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
        else if (lnaState == 5) return "5";
        else if (lnaState == 6) return "6";
        else if (lnaState == 7) return "7";
-       else                    return "8";
+       else if (lnaState == 8) return "8";
+       else                    return "9";
     }
     else
 #endif
@@ -933,18 +951,6 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     {
        return std::to_string(setPoint);
     }
-#ifdef RSP2_AM_PORT_ANT_SEL_AS_SETTINGS
-    else if (key == "ant_sel")
-    {
-       if (antSel == mir_sdr_RSPII_ANTENNA_A) return "Antenna A";
-       else                                   return "Antenna B";
-    }
-    else if (key == "amport_ctrl")
-    {
-       if (amPort == 0) return "AntA/AntB";
-       else             return "Hi-Z";
-    }
-#endif
     else if (key == "extref_ctrl")
     {
        if (extRef == 0) return "false";
@@ -957,8 +963,13 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
     }
     else if (key == "rfnotch_ctrl")
     {
-       if (notechEn == 0) return "false";
-       else               return "true";
+       if (notchEn == 0) return "false";
+       else              return "true";
+    }
+    else if (key == "dabnotch_ctrl")
+    {
+       if (dabNotchEn == 0) return "false";
+       else                 return "true";
     }
 
     // SoapySDR_logf(SOAPY_SDR_WARNING, "Unknown setting '%s'", key.c_str());

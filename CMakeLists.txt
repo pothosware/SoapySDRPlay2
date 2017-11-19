@@ -39,20 +39,10 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 # Configurable feature set 
-SET (RF_GAIN_IN_MENU OFF CACHE BOOL "Use Rf gain as setting, else like a IFGR gain control")
-SET (RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS ON CACHE BOOL "RSP2 only: If on, AM_port and Ant_Sel are declared as antennas")
-SET (RSP2_AM_PORT_ANT_SEL_AS_SETTINGS OFF CACHE BOOL "RSP2 only: If on, AM_port and Ant_Sel are declared as settings")
+SET (RF_GAIN_IN_MENU ON CACHE BOOL "Add Rf gain as a setting, additionally to the IFGR gain control")
 
 IF(RF_GAIN_IN_MENU) 
     ADD_DEFINITIONS( -DRF_GAIN_IN_MENU=1 )
-ENDIF()
-
-IF(RSP2_AM_PORT_ANT_SEL_AS_ANTENNAS) 
-    ADD_DEFINITIONS( -DRSP2_AM_PORT_ANT_SEL_AS_ANTENNAS=1 )
-ENDIF()
-
-IF(RSP2_AM_PORT_ANT_SEL_AS_SETTINGS) 
-    ADD_DEFINITIONS( -DRSP2_AM_PORT_ANT_SEL_AS_SETTINGS=1 )
 ENDIF()
 
 SOAPY_SDR_MODULE_UTIL(
