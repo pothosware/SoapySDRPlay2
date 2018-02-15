@@ -285,6 +285,8 @@ public:
     * Public variables
     ******************************************************************/
     
+    mutable std::mutex _general_state_mutex;
+
     std::mutex _buf_mutex;
     std::condition_variable _buf_cond;
 

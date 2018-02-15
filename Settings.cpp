@@ -49,6 +49,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 	// retreive hwVer and serNo by API
 	unsigned int nDevs = 0;
 
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
 	mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
 	if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail)) {
@@ -117,6 +119,8 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     if (streamActive)
     {
         mir_sdr_StreamUninit();
@@ -191,6 +195,8 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
         return;       
     }
 
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     bool changeToAntennaA_B = false;
 
     if (name == "Antenna A") {
@@ -231,6 +237,8 @@ void SoapySDRPlay::setAntenna(const int direction, const size_t channel, const s
 
 std::string SoapySDRPlay::getAntenna(const int direction, const size_t channel) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     if (direction == SOAPY_SDR_TX) {
         return "";
     }
@@ -262,6 +270,8 @@ bool SoapySDRPlay::hasDCOffsetMode(const int direction, const size_t channel) co
 
 void SoapySDRPlay::setDCOffsetMode(const int direction, const size_t channel, const bool automatic)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     //enable/disable automatic DC removal
     dcOffsetMode = automatic;
     mir_sdr_DCoffsetIQimbalanceControl((unsigned int)automatic, (unsigned int)automatic);
@@ -269,6 +279,8 @@ void SoapySDRPlay::setDCOffsetMode(const int direction, const size_t channel, co
 
 bool SoapySDRPlay::getDCOffsetMode(const int direction, const size_t channel) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     return dcOffsetMode;
 }
 
@@ -301,6 +313,8 @@ bool SoapySDRPlay::hasGainMode(const int direction, const size_t channel) const
 
 void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const bool automatic)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     agcMode = mir_sdr_AGC_DISABLE;
 
     if (automatic == true) {
@@ -313,11 +327,15 @@ void SoapySDRPlay::setGainMode(const int direction, const size_t channel, const 
 
 bool SoapySDRPlay::getGainMode(const int direction, const size_t channel) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     return (agcMode == mir_sdr_AGC_DISABLE)? false: true;
 }
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const std::string &name, const double value)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
    bool doUpdate = false;
 
    if (name == "IFGR")
@@ -348,6 +366,8 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
    if (name == "IFGR")
    {
        return current_gRdB;
@@ -391,6 +411,8 @@ void SoapySDRPlay::setFrequency(const int direction,
                                 const double frequency,
                                 const SoapySDR::Kwargs &args)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
    if (direction == SOAPY_SDR_RX)
    {
       if ((name == "RF") && (centerFrequency != (uint32_t)frequency))
@@ -411,6 +433,8 @@ void SoapySDRPlay::setFrequency(const int direction,
 
 double SoapySDRPlay::getFrequency(const int direction, const size_t channel, const std::string &name) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     if (name == "RF")
     {
         return (double)centerFrequency;
@@ -454,6 +478,8 @@ SoapySDR::ArgInfoList SoapySDRPlay::getFrequencyArgsInfo(const int direction, co
 
 void SoapySDRPlay::setSampleRate(const int direction, const size_t channel, const double rate)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     SoapySDR_logf(SOAPY_SDR_DEBUG, "Setting sample rate: %d", sampleRate);
 
     if (direction == SOAPY_SDR_RX)
@@ -530,6 +556,8 @@ uint32_t SoapySDRPlay::getInputSampleRateAndDecimation(uint32_t rate, unsigned i
 
 void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const double bw_in)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
    if (direction == SOAPY_SDR_RX) 
    {
       if (getBwValueFromEnum(bwMode) != bw_in)
@@ -545,6 +573,8 @@ void SoapySDRPlay::setBandwidth(const int direction, const size_t channel, const
 
 double SoapySDRPlay::getBandwidth(const int direction, const size_t channel) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
    if (direction == SOAPY_SDR_RX)
    {
       return getBwValueFromEnum(bwMode);
@@ -842,6 +872,8 @@ SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 
 void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value)
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
 #ifdef RF_GAIN_IN_MENU
    if (key == "rfgain_sel")
    {
@@ -922,6 +954,8 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 
 std::string SoapySDRPlay::readSetting(const std::string &key) const
 {
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
 #ifdef RF_GAIN_IN_MENU
     if (key == "rfgain_sel")
     {
