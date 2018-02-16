@@ -90,11 +90,9 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     gRdB = 40;
     lnaState = (hwVer == 2 || hwVer > 253)? 4: 1;
 
-    numBuffers = DEFAULT_NUM_BUFFERS;
-    bufferElems = DEFAULT_BUFFER_LENGTH;
-    elementsPerSample = DEFAULT_ELEMS_PER_SAMPLE;
+    //this may change later according to format
     shortsPerWord = 1;
-    bufferLength = bufferElems * elementsPerSample;
+    bufferLength = bufferElems * elementsPerSample * shortsPerWord;
 
     agcMode = mir_sdr_AGC_100HZ;
     dcOffsetMode = true;

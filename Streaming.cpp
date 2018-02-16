@@ -137,21 +137,19 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
        throw std::runtime_error("setupStream invalid channel selection");
     }
     
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
-    bufferLength = bufferElems * elementsPerSample;
-
     // check the format
     if (format == "CS16") 
     {
         useShort = true;
+        shortsPerWord = 1;
+        bufferLength = bufferElems * elementsPerSample * shortsPerWord;
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CS16.");
     } 
     else if (format == "CF32") 
     {
         useShort = false;
         shortsPerWord = sizeof(float) / sizeof(short);
-        bufferLength *= shortsPerWord;  // allocate enough space for floats instead of shorts
+        bufferLength = bufferElems * elementsPerSample * shortsPerWord;  // allocate enough space for floats instead of shorts
         SoapySDR_log(SOAPY_SDR_INFO, "Using format CF32.");
     } 
     else 
@@ -159,6 +157,8 @@ SoapySDR::Stream *SoapySDRPlay::setupStream(const int direction,
        throw std::runtime_error( "setupStream invalid format '" + format +
                                   "' -- Only CS16 or CF32 are supported by the SoapySDRPlay module.");
     }
+
+    std::lock_guard<std::mutex> lock(_buf_mutex);
 
     // clear async fifo counts
     _buf_tail = 0;
@@ -187,8 +187,7 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
 
 size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
 {
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
+    // is a constant in practice
     return bufferElems;
 }
 
@@ -210,7 +209,7 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     
     //Enable (= 1) API calls tracing,
     //but only for debug purposes due to its performance impact. 
-    mir_sdr_DebugEnable(0);
+    mir_sdr_DebugEnable(1);
 
     err = mir_sdr_StreamInit(&gRdB, sampleRate / 1e6, centerFrequency / 1e6, bwMode,
                              ifMode, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps,
@@ -255,7 +254,9 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
                              int &flags,
                              long long &timeNs,
                              const long timeoutUs)
-{    
+{   
+    std::lock_guard <std::mutex> lock(_general_state_mutex);
+
     if (!streamActive) 
     {
         return 0;
@@ -264,8 +265,6 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     // this is the user's buffer for channel 0
     void *buff0 = buffs[0];
     
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
     // are elements left in the buffer? if not, do a new read.
     if (bufferedElems == 0)
     {
