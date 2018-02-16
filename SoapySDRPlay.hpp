@@ -269,7 +269,7 @@ private:
     std::atomic_uint shortsPerWord;
  
     mir_sdr_AgcControlT agcMode;
-    bool streamActive;
+    std::atomic_bool streamActive;
   
     bool dcOffsetMode;
     std::atomic_bool useShort;
@@ -302,7 +302,7 @@ public:
     size_t	_buf_count;
     short *_currentBuff;
     bool _overflowEvent;
-    size_t bufferedElems;
+    std::atomic_size_t bufferedElems;
     size_t _currentHandle;
     std::atomic_bool resetBuffer;
 };

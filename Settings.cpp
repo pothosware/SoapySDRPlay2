@@ -49,8 +49,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 	// retreive hwVer and serNo by API
 	unsigned int nDevs = 0;
 
-    std::lock_guard <std::mutex> lock(_general_state_mutex);
-
 	mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
 	if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail)) {
