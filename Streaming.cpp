@@ -182,7 +182,6 @@ void SoapySDRPlay::closeStream(SoapySDR::Stream *stream)
         mir_sdr_StreamUninit();
     }
     streamActive = false;
-    return;
 }
 
 size_t SoapySDRPlay::getStreamMTU(SoapySDR::Stream *stream) const
@@ -267,34 +266,48 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     // are elements left in the buffer? if not, do a new read.
     if (bufferedElems == 0)
     {
+        ::printf("ENTER if(bufferedElems == 0)\n");
+        ::printf("BEFORE acquireReadBuffer()\n");
         int ret = this->acquireReadBuffer(stream, _currentHandle, (const void **)&_currentBuff, flags, timeNs, timeoutUs);
+        ::printf("AFTER acquireReadBuffer() = %d\n", ret);
         if (ret < 0)
         {
             return ret;
         }
         bufferedElems = ret;
+        ::printf("EXIT bufferedElems == 0\n");
     }
 
     size_t returnedElems = std::min(bufferedElems.load(), numElems);
 
+    ::printf("BEFORE memcpy: bufferedElems = %lld, numElems = %lld, => returnedElems = %lld\n", bufferedElems.load(), numElems, returnedElems);
+
     // copy into user's buff0
     if (useShort)
     {
+        ::printf("BEFORE useShort = true,  memcpy \n");
         std::memcpy(buff0, _currentBuff, returnedElems * 2 * sizeof(short));
+        ::printf("AFTER useShort = true, memcpy\n");
     }
     else
     {
+        ::printf("BEFORE useShort = false, memcpy\n");
         std::memcpy(buff0, (float *)_currentBuff, returnedElems * 2 * sizeof(float));
+        ::printf("AFTER useShort = false, memcpy\n");
     }
     
     // bump variables for next call into readStream
     bufferedElems -= returnedElems;
 
+    ::printf("AFTER memcpy: bufferedElems = %lld\n", bufferedElems.load());
+
+
     // scope lock here to update _currentBuff position
     {
         std::lock_guard <std::mutex> lock(_buf_mutex);
-
+        ::printf("BEFORE update _currentBuff = 0x%p\n", _currentBuff);
         _currentBuff += returnedElems * elementsPerSample * shortsPerWord;
+        ::printf("AFTER update _currentBuff = 0x%p\n", _currentBuff);
     }
 
     // return number of elements written to buff0
@@ -304,7 +317,9 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
     }
     else
     {
+        ::printf("BEFORE releaseReadBuffer()\n");
         this->releaseReadBuffer(stream, _currentHandle);
+        ::printf("AFTER releaseReadBuffer()\n");
     }
     return (int)returnedElems;
 }
