@@ -49,7 +49,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    }
    //Enable (= 1) API calls tracing,
    //but only for debug purposes due to its performance impact. 
-   mir_sdr_DebugEnable(1);
+   mir_sdr_DebugEnable(0);
 
    std::string baseLabel = "SDRplay Dev";
 
