@@ -258,15 +258,21 @@ private:
     unsigned int decEnable;
     uint32_t centerFrequency;
     double ppm;
-    unsigned int bufferLength;
-    unsigned int bufferElems;
-    unsigned int shortsPerWord;
-    size_t numBuffers;
+    std::atomic_int bufferLength;
+
+    //numBuffers, bufferElems, elementsPerSample
+    //are indeed constants
+    const size_t numBuffers = DEFAULT_NUM_BUFFERS;
+    const unsigned int bufferElems = DEFAULT_BUFFER_LENGTH;
+    const int elementsPerSample = DEFAULT_ELEMS_PER_SAMPLE;
+
+    std::atomic_uint shortsPerWord;
+ 
     mir_sdr_AgcControlT agcMode;
-    bool streamActive;
-    int elementsPerSample;
+    std::atomic_bool streamActive;
+  
     bool dcOffsetMode;
-    bool useShort;
+    std::atomic_bool useShort;
 
     unsigned int IQcorr;
     int setPoint;
@@ -285,6 +291,8 @@ public:
     * Public variables
     ******************************************************************/
     
+    mutable std::mutex _general_state_mutex;
+
     std::mutex _buf_mutex;
     std::condition_variable _buf_cond;
 
@@ -294,7 +302,7 @@ public:
     size_t	_buf_count;
     short *_currentBuff;
     bool _overflowEvent;
-    size_t bufferedElems;
+    std::atomic_size_t bufferedElems;
     size_t _currentHandle;
-    bool resetBuffer;
+    std::atomic_bool resetBuffer;
 };
