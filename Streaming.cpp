@@ -211,6 +211,11 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
     //but only for debug purposes due to its performance impact. 
     mir_sdr_DebugEnable(0);
 
+    //temporary fix for ARM targets.
+#if defined(__arm__) || defined(__aarch64__)
+    mir_sdr_SetTransferMode(mir_sdr_BULK);
+#endif
+
     err = mir_sdr_StreamInit(&gRdB, sampleRate / 1e6, centerFrequency / 1e6, bwMode,
                              ifMode, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps,
                              _rx_callback, _gr_callback, (void *)this);
