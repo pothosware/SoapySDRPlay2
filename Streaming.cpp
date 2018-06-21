@@ -52,7 +52,7 @@ SoapySDR::ArgInfoList SoapySDRPlay::getStreamArgsInfo(const int direction, const
  ******************************************************************/
 
 static void _rx_callback(short *xi, short *xq, unsigned int firstSampleNum, int grChanged, int rfChanged, 
-                         int fsChanged, unsigned int numSamples, unsigned int reset, void *cbContext)
+                         int fsChanged, unsigned int numSamples, unsigned int reset, unsigned int hwRemoved, void *cbContext)
 {
     SoapySDRPlay *self = (SoapySDRPlay *)cbContext;
     return self->rx_callback(xi, xq, numSamples);
