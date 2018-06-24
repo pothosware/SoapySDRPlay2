@@ -68,7 +68,11 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
          dev["driver"] = "sdrplay";
          if (rspDevs[devIdx].hwVer > 253)
          {
-             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %d %s", devIdx, rspDevs[devIdx].hwVer, rspDevs[devIdx].SerNo);
+             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", devIdx, rspDevs[devIdx].SerNo);
+         }
+         else if (rspDevs[devIdx].hwVer == 3)
+         {
+             sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", devIdx, rspDevs[devIdx].SerNo);
          }
          else
          {
@@ -88,7 +92,11 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
             dev["driver"] = "sdrplay";
             if (rspDevs[i].hwVer > 253)
             {
-               sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
+               sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
+            }
+            else if (rspDevs[i].hwVer == 3)
+            {
+               sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
             }
             else
             {
