@@ -118,8 +118,31 @@ void SoapySDRPlay::rx_callback(short *xi, short *xq, unsigned int numSamples)
 
 void SoapySDRPlay::gr_callback(unsigned int gRdB, unsigned int lnaGRdB)
 {
-    current_gRdB = gRdB;
     //Beware, lnaGRdB is really the LNA GR, NOT the LNA state !
+ 
+    mir_sdr_GainValuesT gainVals;
+
+    mir_sdr_GetCurrentGain(&gainVals);
+
+    if (gRdB < 200)
+    {
+        current_gRdB = gRdB;
+    }
+
+    if (gRdB < mir_sdr_GAIN_MESSAGE_START_ID)
+    {
+        // gainVals.curr is a calibrated gain value
+    }
+    else if (gRdB == mir_sdr_ADC_OVERLOAD_DETECTED)
+    {
+        mir_sdr_GainChangeCallbackMessageReceived();
+        // OVERLOAD DECTECTED
+    }
+    else
+    {
+        mir_sdr_GainChangeCallbackMessageReceived();
+        // OVERLOAD CORRECTED
+    }
 }
 
 /*******************************************************************
