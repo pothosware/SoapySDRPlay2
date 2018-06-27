@@ -247,7 +247,7 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
        //throw std::runtime_error("StreamInit Error: " + std::to_string(err));
        return SOAPY_SDR_NOT_SUPPORTED;
     }
-    mir_sdr_DecimateControl(decEnable, decM, 0);
+    mir_sdr_DecimateControl(decEnable, decM, 1);
 
     mir_sdr_SetDcMode(4,0);
     mir_sdr_SetDcTrackTime(63);

@@ -278,6 +278,7 @@ private:
     int setPoint;
 
     mir_sdr_RSPII_AntennaSelectT antSel;
+    mir_sdr_rspDuo_TunerSelT tunSel;
     int amPort;
     unsigned int extRef;
     unsigned int biasTen;
