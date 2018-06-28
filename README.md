@@ -6,7 +6,7 @@
 
 ## Dependencies
 
-* Get SDR Play driver binaries from - http://sdrplay.com/
+* Get SDR Play driver binaries 'API/HW driver v2.x' (not v3.x) from - http://sdrplay.com/downloads
 * SoapySDR - https://github.com/pothosware/SoapySDR/wiki
 
 ## Licensing information
