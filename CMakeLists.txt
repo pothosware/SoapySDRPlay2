@@ -49,7 +49,7 @@ SOAPY_SDR_MODULE_UTIL(
     TARGET sdrPlaySupport
     SOURCES
         SoapySDRPlay.hpp
-        Registation.cpp
+        Registration.cpp
         Settings.cpp
         Streaming.cpp
     LIBRARIES
