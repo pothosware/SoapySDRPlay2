@@ -29,9 +29,6 @@
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
 
-#define MAX_RSP_DEVICES  (4)
-
-static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
 bool deviceSelected = false;
 
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
@@ -52,6 +49,7 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    std::string baseLabel = "SDRplay Dev";
 
    // list devices by API
+   mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
   for (unsigned int i = 0; i < nDevs; i++)
@@ -64,15 +62,15 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
         if (not serialMatch) continue;
         if (rspDevs[i].hwVer > 253)
         {
-           sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
         }
         else if (rspDevs[i].hwVer == 3)
         {
-           sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
         }
         else
         {
-           sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
         }
         dev["label"] = lblstr;
         results.push_back(dev);

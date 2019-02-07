@@ -45,6 +45,8 @@
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
+#define MAX_RSP_DEVICES  (4)
+
 class SoapySDRPlay: public SoapySDR::Device
 {
 public:
