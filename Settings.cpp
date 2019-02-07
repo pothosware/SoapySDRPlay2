@@ -24,7 +24,11 @@
 
 #include "SoapySDRPlay.hpp"
 
-extern bool deviceSelected;    // global declared in Registration.cpp
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
+{
+	static std::set<std::string> serials;
+	return serials;
+}
 
 SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args):
     serNo(args.at("serial"))
@@ -51,7 +55,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args):
     }
 
     mir_sdr_SetDeviceIdx(devIdx);
-    deviceSelected = true;
 
     sampleRate = 2000000;
     reqSampleRate = sampleRate;
@@ -88,10 +91,12 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args):
     useShort = true;
     
     streamActive = false;
+    SoapySDRPlay_getClaimedSerials().insert(serNo);
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    SoapySDRPlay_getClaimedSerials().erase(serNo);
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     if (streamActive)
@@ -100,7 +105,6 @@ SoapySDRPlay::~SoapySDRPlay(void)
     }
     streamActive = false;
     mir_sdr_ReleaseDeviceIdx();
-    deviceSelected = false;
 }
 
 /*******************************************************************

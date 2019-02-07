@@ -29,7 +29,7 @@
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
 
-bool deviceSelected = false;
+static std::map<std::string, SoapySDR::Kwargs> _cachedResults;
 
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
@@ -37,11 +37,6 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
    unsigned int nDevs = 0;
    char lblstr[128];
 
-   if (deviceSelected == true)
-   {
-      mir_sdr_ReleaseDeviceIdx();
-      deviceSelected = false;
-   }
    //Enable (= 1) API calls tracing,
    //but only for debug purposes due to its performance impact. 
    mir_sdr_DebugEnable(0);
@@ -74,8 +69,18 @@ static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
         }
         dev["label"] = lblstr;
         results.push_back(dev);
+        _cachedResults[rspDevs[i].SerNo] = dev;
      }
   }
+
+    //fill in the cached results for claimed handles
+    for (const auto &serial : SoapySDRPlay_getClaimedSerials())
+    {
+        if (_cachedResults.count(serial) == 0) continue;
+        if (args.count("serial") != 0 and args.at("serial") != serial) continue;
+        results.push_back(_cachedResults.at(serial));
+    }
+
    return results;
 }
 

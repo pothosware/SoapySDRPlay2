@@ -34,6 +34,7 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
+#include <set>
 
 #ifdef _WIN32
 #include <mir_sdr.h>
@@ -46,6 +47,8 @@
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
 
 #define MAX_RSP_DEVICES  (4)
+
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
 {
