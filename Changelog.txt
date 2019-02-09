@@ -1,3 +1,11 @@
+Release 0.3.0 (pending)
+==========================
+
+- Implement filter by serial number for enumeration
+- Enumeration can yield the already opened device:
+  Allows the device to be found again in the same process
+  and fixes multiple clients to work with SoapySDR server
+
 Release 0.2.0 (2019-01-07)
 ==========================
 

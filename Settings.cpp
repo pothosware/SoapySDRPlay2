@@ -24,49 +24,29 @@
 
 #include "SoapySDRPlay.hpp"
 
-extern bool deviceSelected;    // global declared in Registration.cpp
-
-#define MAX_RSP_DEVICES  (4)
-
-static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
-
-SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
+std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
 {
-    std::string label = args.at("label");
+	static std::set<std::string> serials;
+	return serials;
+}
 
-	std::string baseLabel = "SDRplay Dev";
+SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args):
+    serNo(args.at("serial"))
+{
+    // retreive hwVer and device index by API
+    unsigned int nDevs = 0;
 
-    size_t posidx = label.find(baseLabel);
+    mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
+    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
-    if (posidx == std::string::npos)
+    unsigned devIdx = MAX_RSP_DEVICES;
+    for (unsigned int i = 0; i < nDevs; i++)
     {
-        SoapySDR_logf(SOAPY_SDR_WARNING, "Can't find Dev string in args");
-        return;
+        if (rspDevs[i].devAvail and rspDevs[i].SerNo == serNo) devIdx = i;
     }
-	//retreive device index
-    unsigned int devIdx = label.at(posidx + baseLabel.length()) - 0x30;
+    if (devIdx == MAX_RSP_DEVICES) throw std::runtime_error("no sdrplay device matches");
 
-	// retreive hwVer and serNo by API
-	unsigned int nDevs = 0;
-
-	mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
-
-	if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail)) {
-
-		hwVer = rspDevs[devIdx].hwVer;
-		serNo = rspDevs[devIdx].SerNo;
-
-		size_t poscom = serNo.find(",");
-
-		if (poscom != std::string::npos)
-		{
-			serNo = serNo.substr(0, poscom);
-		}
-	}
-	else {
-		SoapySDR_logf(SOAPY_SDR_WARNING, "Can't determine hwVer/serNo");
-		return;
-	}
+    hwVer = rspDevs[devIdx].hwVer;
 
     mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)
@@ -75,7 +55,6 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     }
 
     mir_sdr_SetDeviceIdx(devIdx);
-    deviceSelected = true;
 
     sampleRate = 2000000;
     reqSampleRate = sampleRate;
@@ -112,10 +91,12 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     useShort = true;
     
     streamActive = false;
+    SoapySDRPlay_getClaimedSerials().insert(serNo);
 }
 
 SoapySDRPlay::~SoapySDRPlay(void)
 {
+    SoapySDRPlay_getClaimedSerials().erase(serNo);
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
     if (streamActive)
@@ -124,7 +105,6 @@ SoapySDRPlay::~SoapySDRPlay(void)
     }
     streamActive = false;
     mir_sdr_ReleaseDeviceIdx();
-    deviceSelected = false;
 }
 
 /*******************************************************************

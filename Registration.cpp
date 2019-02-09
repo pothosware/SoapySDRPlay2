@@ -29,84 +29,58 @@
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
 
-#define MAX_RSP_DEVICES  (4)
-
-static mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
-bool deviceSelected = false;
+static std::map<std::string, SoapySDR::Kwargs> _cachedResults;
 
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
    std::vector<SoapySDR::Kwargs> results;
-   std::string labelHint;
-   if (args.count("label") != 0) labelHint = args.at("label");
    unsigned int nDevs = 0;
    char lblstr[128];
 
-   if (deviceSelected == true)
-   {
-      mir_sdr_ReleaseDeviceIdx();
-      deviceSelected = false;
-   }
    //Enable (= 1) API calls tracing,
    //but only for debug purposes due to its performance impact. 
    mir_sdr_DebugEnable(0);
 
    std::string baseLabel = "SDRplay Dev";
 
-	// list devices by API
+   // list devices by API
+   mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
    mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
 
-   size_t posidx = labelHint.find(baseLabel);
+  for (unsigned int i = 0; i < nDevs; i++)
+  {
+     if (rspDevs[i].devAvail)
+     {
+        SoapySDR::Kwargs dev;
+        dev["serial"] = rspDevs[i].SerNo;
+        const bool serialMatch = args.count("serial") == 0 or args.at("serial") == dev["serial"];
+        if (not serialMatch) continue;
+        if (rspDevs[i].hwVer > 253)
+        {
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
+        }
+        else if (rspDevs[i].hwVer == 3)
+        {
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
+        }
+        else
+        {
+           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
+        }
+        dev["label"] = lblstr;
+        results.push_back(dev);
+        _cachedResults[rspDevs[i].SerNo] = dev;
+     }
+  }
 
-   if (posidx != std::string::npos)
-   {
-      unsigned int devIdx = labelHint.at(posidx + baseLabel.length()) - 0x30;
+    //fill in the cached results for claimed handles
+    for (const auto &serial : SoapySDRPlay_getClaimedSerials())
+    {
+        if (_cachedResults.count(serial) == 0) continue;
+        if (args.count("serial") != 0 and args.at("serial") != serial) continue;
+        results.push_back(_cachedResults.at(serial));
+    }
 
-      if ((devIdx < nDevs) && (rspDevs[devIdx].devAvail))
-      {
-         SoapySDR::Kwargs dev;
-         dev["driver"] = "sdrplay";
-         if (rspDevs[devIdx].hwVer > 253)
-         {
-             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", devIdx, rspDevs[devIdx].SerNo);
-         }
-         else if (rspDevs[devIdx].hwVer == 3)
-         {
-             sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", devIdx, rspDevs[devIdx].SerNo);
-         }
-         else
-         {
-             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", devIdx, rspDevs[devIdx].hwVer, rspDevs[devIdx].SerNo);
-         }
-         dev["label"] = lblstr;
-         results.push_back(dev);
-      }
-   }
-   else
-   {
-      for (unsigned int i = 0; i < nDevs; i++)
-      {
-         if (rspDevs[i].devAvail)
-         {
-            SoapySDR::Kwargs dev;
-            dev["driver"] = "sdrplay";
-            if (rspDevs[i].hwVer > 253)
-            {
-               sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
-            }
-            else if (rspDevs[i].hwVer == 3)
-            {
-               sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
-            }
-            else
-            {
-               sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
-            }
-            dev["label"] = lblstr;
-            results.push_back(dev);
-         }
-      }
-   }
    return results;
 }
 
