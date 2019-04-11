@@ -30,9 +30,12 @@ std::set<std::string> &SoapySDRPlay_getClaimedSerials(void)
 	return serials;
 }
 
-SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args):
-    serNo(args.at("serial"))
+SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
 {
+    if (args.count("serial") == 0) throw std::runtime_error("no sdrplay device found");
+
+    serNo = args.at("serial");
+
     // retreive hwVer and device index by API
     unsigned int nDevs = 0;
 
