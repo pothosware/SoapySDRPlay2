@@ -121,7 +121,9 @@ std::string SoapySDRPlay::getDriverKey(void) const
 
 std::string SoapySDRPlay::getHardwareKey(void) const
 {
-    return serNo;
+    if (hwVer > 253) return "RSP1A";
+    if (hwVer == 3) return "RSPduo";
+    return "RSP" + std::to_string(hwVer);
 }
 
 SoapySDR::Kwargs SoapySDRPlay::getHardwareInfo(void) const
@@ -132,7 +134,7 @@ SoapySDR::Kwargs SoapySDRPlay::getHardwareInfo(void) const
 
     hwArgs["mir_sdr_api_version"] = std::to_string(ver);
     hwArgs["mir_sdr_hw_version"] = std::to_string(hwVer);
-
+    hwArgs["serial"] = serNo;
     return hwArgs;
 }
 
