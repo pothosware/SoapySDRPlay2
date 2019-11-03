@@ -435,8 +435,8 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
 void SoapySDRPlay::setGain(const int direction, const size_t channel, const double value)
 {
-   // Only IFGR should be used for adjusting the overall system gain.
-   this->setGain(direction, channel, "IFGR", value);
+   // Only IF should be used for adjusting the overall system gain.
+   this->setGain(direction, channel, "IF", value);
 }
 
 double SoapySDRPlay::getGain(const int direction, const size_t channel, const std::string &name) const
@@ -475,8 +475,8 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
 {
-   // Only IFGR should be used for adjusting the overall system gain.
-   return this->getGainRange(direction, channel, "IFGR");
+   // Only IF should be used for adjusting the overall system gain.
+   return this->getGainRange(direction, channel, "IF");
 }
 
 /*******************************************************************
