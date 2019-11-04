@@ -357,7 +357,7 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     //the functions below have a "name" parameter
     std::vector<std::string> results;
 
-    results.push_back("IFGR");
+    results.push_back("IF");
     results.push_back("RFGR");
 
     return results;
@@ -395,15 +395,18 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
 
    bool doUpdate = false;
 
-   if (name == "IFGR")
+   if (name == "IF")
    {
-      //Depending of the previously used AGC context, the real applied 
-      // gain may be either gRdB or current_gRdB, so apply the change if required value is different 
-      //from one of them.
-      if ((gRdB != (int)value) || (current_gRdB != (int)value))
+      // gRdB is a gain *reduction*, so we negate the SoapySDR "IF gain"
+      // in order to obtain the new gRdB.
+      int new_gRdB = -((int)value);
+      // Depending of the previously used AGC context, the real
+      // applied gain may be either gRdB or current_gRdB, so apply the
+      // change if the required value is different from one of them.
+      if ((gRdB != new_gRdB) || (current_gRdB != new_gRdB))
       {
-         gRdB = (int)value;
-         current_gRdB = (int)value;
+         gRdB = new_gRdB;
+         current_gRdB = new_gRdB;
          doUpdate = true;
       }
    }
@@ -431,9 +434,10 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-   if (name == "IFGR")
+   if (name == "IF")
    {
-       return current_gRdB;
+       // gRdB is a gain *reduction*, so we negate it to obtain the SoapySDR "IF gain".
+       return -current_gRdB;
    }
    else if (name == "RFGR")
    {
@@ -445,11 +449,7 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
-   if (name == "IFGR")
-   {
-      return SoapySDR::Range(20, 59);
-   }
-   else if ((name == "RFGR") && (hwVer == 1))
+   if ((name == "RFGR") && (hwVer == 1))
    {
       return SoapySDR::Range(0, 3);
    }
@@ -465,7 +465,10 @@ SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t cha
    {
       return SoapySDR::Range(0, 9);
    }
-    return SoapySDR::Range(20, 59);
+   else  // IF gain
+   {
+      return SoapySDR::Range(-59, -20);
+   }
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
