@@ -258,6 +258,7 @@ private:
     int gRdBsystem;
     int sps;
     int lnaState;
+    int maxLnaState;
     int hwVer;
 
     //cached settings

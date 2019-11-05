@@ -50,6 +50,10 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     if (devIdx == MAX_RSP_DEVICES) throw std::runtime_error("no sdrplay device matches");
 
     hwVer = rspDevs[devIdx].hwVer;
+    maxLnaState = 3;                    // RSP1 / default
+    if (hwVer == 2)   maxLnaState = 8;  // RSP2
+    if (hwVer == 3)   maxLnaState = 9;  // RSPduo
+    if (hwVer > 253)  maxLnaState = 9;  // RSP1a
 
     mir_sdr_ApiVersion(&ver);
     if (ver != MIR_SDR_API_VERSION)
@@ -357,8 +361,10 @@ std::vector<std::string> SoapySDRPlay::listGains(const int direction, const size
     //the functions below have a "name" parameter
     std::vector<std::string> results;
 
+#ifdef LNA_STATE_AS_GAIN
+    results.push_back("RF");
+#endif
     results.push_back("IF");
-    results.push_back("RFGR");
 
     return results;
 }
@@ -410,15 +416,18 @@ void SoapySDRPlay::setGain(const int direction, const size_t channel, const std:
          doUpdate = true;
       }
    }
-   else if (name == "RFGR")
+#ifdef LNA_STATE_AS_GAIN
+   else if (name == "RF")
    {
-      if (lnaState != (int)value) {
-
-          lnaState = (int)value;
+      // The RF gain is negated to obtain the LNA state.
+      int newLnaState = -((int)value);
+      if (lnaState != newLnaState) {
+          lnaState = newLnaState;
           doUpdate = true;
       }
    }
-   if ((doUpdate == true) && (streamActive))
+#endif
+   if (doUpdate && streamActive)
    {
       mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_GR);
    }
@@ -439,36 +448,29 @@ double SoapySDRPlay::getGain(const int direction, const size_t channel, const st
        // gRdB is a gain *reduction*, so we negate it to obtain the SoapySDR "IF gain".
        return -current_gRdB;
    }
-   else if (name == "RFGR")
+#ifdef LNA_STATE_AS_GAIN
+   else if (name == "RF")
    {
-      return lnaState;
+      // LNA state 0 is the minimum numeric value but corresponds to maximum gain.
+      // We define the RF gain as the negative of the LNA state so that any gain
+      // adjustment controls (e.g. CubicSDR sliders) operate in the correct direction.
+      return -lnaState;
    }
+#endif
 
    return 0;
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel, const std::string &name) const
 {
-   if ((name == "RFGR") && (hwVer == 1))
+#ifdef LNA_STATE_AS_GAIN
+   if (name == "RF")
    {
-      return SoapySDR::Range(0, 3);
+      return SoapySDR::Range(-maxLnaState, 0);
    }
-   else if ((name == "RFGR") && (hwVer == 2))
-   {
-      return SoapySDR::Range(0, 8);
-   }
-   else if ((name == "RFGR") && (hwVer == 3))
-   {
-      return SoapySDR::Range(0, 9);
-   }
-   else if ((name == "RFGR") && (hwVer > 253))
-   {
-      return SoapySDR::Range(0, 9);
-   }
-   else  // IF gain
-   {
-      return SoapySDR::Range(-59, -20);
-   }
+#endif
+   // IF gain
+   return SoapySDR::Range(-59, -20);
 }
 
 SoapySDR::Range SoapySDRPlay::getGainRange(const int direction, const size_t channel) const
@@ -810,83 +812,18 @@ std::string SoapySDRPlay::IFtoString(mir_sdr_If_kHzT ifkHzT)
 SoapySDR::ArgInfoList SoapySDRPlay::getSettingInfo(void) const
 {
     SoapySDR::ArgInfoList setArgs;
- 
-#ifdef RF_GAIN_IN_MENU
-    if (hwVer == 2)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       setArgs.push_back(RfGainArg);
+
+    SoapySDR::ArgInfo LnaStateArg;
+    LnaStateArg.key = "lna_state";
+    LnaStateArg.value = std::to_string(maxLnaState / 2);
+    LnaStateArg.name = "RF Gain Select";
+    LnaStateArg.description = "SDRPlay LNA State";
+    LnaStateArg.type = SoapySDR::ArgInfo::STRING;
+    for (int i = 0; i <= maxLnaState; i++) {
+       LnaStateArg.options.push_back(std::to_string(i));
     }
-    else if (hwVer == 3)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else if (hwVer > 253)
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "4";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       RfGainArg.options.push_back("4");
-       RfGainArg.options.push_back("5");
-       RfGainArg.options.push_back("6");
-       RfGainArg.options.push_back("7");
-       RfGainArg.options.push_back("8");
-       RfGainArg.options.push_back("9");
-       setArgs.push_back(RfGainArg);
-    }
-    else
-    {
-       SoapySDR::ArgInfo RfGainArg;
-       RfGainArg.key = "rfgain_sel";
-       RfGainArg.value = "1";
-       RfGainArg.name = "RF Gain Select";
-       RfGainArg.description = "RF Gain Select";
-       RfGainArg.type = SoapySDR::ArgInfo::STRING;
-       RfGainArg.options.push_back("0");
-       RfGainArg.options.push_back("1");
-       RfGainArg.options.push_back("2");
-       RfGainArg.options.push_back("3");
-       setArgs.push_back(RfGainArg);
-    }
-#endif
-    
+    setArgs.push_back(LnaStateArg);
+
     SoapySDR::ArgInfo AIFArg;
     AIFArg.key = "if_mode";
     AIFArg.value = IFtoString(ifMode);
@@ -1010,19 +947,12 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-#ifdef RF_GAIN_IN_MENU
-   if (key == "rfgain_sel")
+   if (key == "lna_state")
    {
-      if      (value == "0") lnaState = 0;
-      else if (value == "1") lnaState = 1;
-      else if (value == "2") lnaState = 2;
-      else if (value == "3") lnaState = 3;
-      else if (value == "4") lnaState = 4;
-      else if (value == "5") lnaState = 5;
-      else if (value == "6") lnaState = 6;
-      else if (value == "7") lnaState = 7;
-      else if (value == "8") lnaState = 8;
-      else                   lnaState = 9;
+      int newLnaState = std::stoi(value);
+      if (newLnaState >= 0 && newLnaState <= maxLnaState) {
+         lnaState = newLnaState;
+      }
       if (agcMode != mir_sdr_AGC_DISABLE)
       {
          mir_sdr_AgcControl(agcMode, setPoint, 0, 0, 0, 0, lnaState);
@@ -1032,9 +962,7 @@ void SoapySDRPlay::writeSetting(const std::string &key, const std::string &value
          mir_sdr_Reinit(&gRdB, 0.0, 0.0, mir_sdr_BW_Undefined, mir_sdr_IF_Undefined, mir_sdr_LO_Undefined, lnaState, &gRdBsystem, mir_sdr_USE_RSP_SET_GR, &sps, mir_sdr_CHANGE_GR);
       }
    }
-   else
-#endif
-   if (key == "if_mode")
+   else if (key == "if_mode")
    {
       if (ifMode != stringToIF(value))
       {
@@ -1100,23 +1028,11 @@ std::string SoapySDRPlay::readSetting(const std::string &key) const
 {
     std::lock_guard <std::mutex> lock(_general_state_mutex);
 
-#ifdef RF_GAIN_IN_MENU
-    if (key == "rfgain_sel")
+    if (key == "lna_state")
     {
-       if      (lnaState == 0) return "0";
-       else if (lnaState == 1) return "1";
-       else if (lnaState == 2) return "2";
-       else if (lnaState == 3) return "3";
-       else if (lnaState == 4) return "4";
-       else if (lnaState == 5) return "5";
-       else if (lnaState == 6) return "6";
-       else if (lnaState == 7) return "7";
-       else if (lnaState == 8) return "8";
-       else                    return "9";
+       return std::to_string(lnaState);
     }
-    else
-#endif
-    if (key == "if_mode")
+    else if (key == "if_mode")
     {
         return IFtoString(ifMode);
     }
