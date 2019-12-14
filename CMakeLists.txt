@@ -1,5 +1,5 @@
 ########################################################################
-# Build Soapy SDR support module for SDRPlay
+# Build Soapy SDR support module for SDRplay (API version 3)
 ########################################################################
 cmake_minimum_required(VERSION 2.8.7)
 project(SoapySDRPlay CXX)
@@ -13,7 +13,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(LibSDRplay)
 
 if (NOT LIBSDRPLAY_FOUND)
-    message(FATAL_ERROR "SDRPlay development files not found...")
+    message(FATAL_ERROR "SDRplay development files not found...")
 endif ()
 message(STATUS "LIBSDRPLAY_INCLUDE_DIRS - ${LIBSDRPLAY_INCLUDE_DIRS}")
 message(STATUS "LIBSDRPLAY_LIBRARIES - ${LIBSDRPLAY_LIBRARIES}")

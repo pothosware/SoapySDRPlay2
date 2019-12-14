@@ -2,6 +2,8 @@
  * The MIT License (MIT)
  * 
  * Copyright (c) 2015 Charles J. Cliffe
+ * Copyright (c) 2019 Franco Venturi - changes for SDRplay API version 3
+ *                                     and Dual Tuner for RSPduo
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,58 +31,117 @@
 #define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
 #endif
 
-static std::map<std::string, SoapySDR::Kwargs> _cachedResults;
+static bool isAtExitRegistered = false;
+static sdrplay_api_DeviceT rspDevs[SDRPLAY_MAX_DEVICES];
+bool isSdrplayApiOpen = false;
+sdrplay_api_DeviceT *deviceSelected = nullptr;
+
+static void close_sdrplay_api(void)
+{
+   if (deviceSelected)
+   {
+      sdrplay_api_ReleaseDevice(deviceSelected);
+      deviceSelected = nullptr;
+   }
+   if (isSdrplayApiOpen == true)
+   {
+      sdrplay_api_Close();
+      isSdrplayApiOpen = false;
+   }
+}
 
 static std::vector<SoapySDR::Kwargs> findSDRPlay(const SoapySDR::Kwargs &args)
 {
    std::vector<SoapySDR::Kwargs> results;
+   std::string labelHint;
+   if (args.count("label") != 0) labelHint = args.at("label");
    unsigned int nDevs = 0;
    char lblstr[128];
 
-   //Enable (= 1) API calls tracing,
-   //but only for debug purposes due to its performance impact. 
-   mir_sdr_DebugEnable(0);
+   if (isAtExitRegistered == false)
+   {
+       atexit(close_sdrplay_api);
+       isAtExitRegistered = true;
+   }
+
+   if (isSdrplayApiOpen == false)
+   {
+      sdrplay_api_ErrT err;
+      if ((err = sdrplay_api_Open()) != sdrplay_api_Success)
+      {
+          return results;
+      }
+      isSdrplayApiOpen = true;
+   }
+
+   if (deviceSelected)
+   {
+      sdrplay_api_ReleaseDevice(deviceSelected);
+      deviceSelected = nullptr;
+   }
 
    std::string baseLabel = "SDRplay Dev";
 
    // list devices by API
-   mir_sdr_DeviceT rspDevs[MAX_RSP_DEVICES];
-   mir_sdr_GetDevices(&rspDevs[0], &nDevs, MAX_RSP_DEVICES);
+   sdrplay_api_LockDeviceApi();
+   sdrplay_api_GetDevices(&rspDevs[0], &nDevs, SDRPLAY_MAX_DEVICES);
 
-  for (unsigned int i = 0; i < nDevs; i++)
-  {
-     if (rspDevs[i].devAvail)
-     {
-        SoapySDR::Kwargs dev;
-        dev["serial"] = rspDevs[i].SerNo;
-        const bool serialMatch = args.count("serial") == 0 or args.at("serial") == dev["serial"];
-        if (not serialMatch) continue;
-        if (rspDevs[i].hwVer > 253)
-        {
-           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
-        }
-        else if (rspDevs[i].hwVer == 3)
-        {
-           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
-        }
-        else
-        {
-           sprintf_s(lblstr, sizeof(lblstr), "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
-        }
-        dev["label"] = lblstr;
-        results.push_back(dev);
-        _cachedResults[rspDevs[i].SerNo] = dev;
-     }
-  }
+   size_t posidx = labelHint.find(baseLabel);
 
-    //fill in the cached results for claimed handles
-    for (const auto &serial : SoapySDRPlay_getClaimedSerials())
-    {
-        if (_cachedResults.count(serial) == 0) continue;
-        if (args.count("serial") != 0 and args.at("serial") != serial) continue;
-        results.push_back(_cachedResults.at(serial));
-    }
+   if (posidx != std::string::npos)
+   {
+      unsigned int devIdx = labelHint.at(posidx + baseLabel.length()) - 0x30;
 
+      if (devIdx < nDevs)
+      {
+         SoapySDR::Kwargs dev;
+         dev["driver"] = "sdrplay";
+         if (rspDevs[devIdx].hwVer == SDRPLAY_RSP1A_ID)
+         {
+             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", devIdx, rspDevs[devIdx].SerNo);
+         }
+         else if (rspDevs[devIdx].hwVer == SDRPLAY_RSPduo_ID)
+         {
+             sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", devIdx, rspDevs[devIdx].SerNo);
+         }
+         else
+         {
+             sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", devIdx, rspDevs[devIdx].hwVer, rspDevs[devIdx].SerNo);
+         }
+         dev["label"] = lblstr;
+         results.push_back(dev);
+      }
+   }
+   else
+   {
+      for (unsigned int i = 0; i < nDevs; i++)
+      {
+         SoapySDR::Kwargs dev;
+         dev["driver"] = "sdrplay";
+         if (rspDevs[i].hwVer == SDRPLAY_RSP1A_ID)
+         {
+            sprintf_s(lblstr, 128, "SDRplay Dev%d RSP1A %s", i, rspDevs[i].SerNo);
+         }
+         else if (rspDevs[i].hwVer == SDRPLAY_RSPduo_ID)
+         {
+            sprintf_s(lblstr, 128, "SDRplay Dev%d RSPduo %s", i, rspDevs[i].SerNo);
+         }
+         else
+         {
+            sprintf_s(lblstr, 128, "SDRplay Dev%d RSP%d %s", i, rspDevs[i].hwVer, rspDevs[i].SerNo);
+         }
+         dev["label"] = lblstr;
+         results.push_back(dev);
+      }
+   }
+
+   // unlock sdrplay API and close it in case some other driver needs it
+   sdrplay_api_UnlockDeviceApi();
+   if (isSdrplayApiOpen == true)
+   {
+      sdrplay_api_Close();
+      isSdrplayApiOpen = false;
+   }
    return results;
 }
 
@@ -89,4 +150,4 @@ static SoapySDR::Device *makeSDRPlay(const SoapySDR::Kwargs &args)
     return new SoapySDRPlay(args);
 }
 
-static SoapySDR::Registry registerSDRPlay("sdrplay", &findSDRPlay, &makeSDRPlay, SOAPY_SDR_ABI_VERSION);
+static SoapySDR::Registry registerSDRPlay("sdrPlay", &findSDRPlay, &makeSDRPlay, SOAPY_SDR_ABI_VERSION);

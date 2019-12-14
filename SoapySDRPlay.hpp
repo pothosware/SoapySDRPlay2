@@ -2,6 +2,8 @@
  * The MIT License (MIT)
  * 
  * Copyright (c) 2015 Charles J. Cliffe
+ * Copyright (c) 2019 Franco Venturi - changes for SDRplay API version 3
+ *                                     and Dual Tuner for RSPduo
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,21 +36,12 @@
 #include <string>
 #include <cstring>
 #include <algorithm>
-#include <set>
 
-#ifdef _WIN32
-#include <mir_sdr.h>
-#else
-#include <mirsdrapi-rsp.h>
-#endif
+#include <sdrplay_api.h>
 
 #define DEFAULT_BUFFER_LENGTH     (65536)
 #define DEFAULT_NUM_BUFFERS       (8)
 #define DEFAULT_ELEMS_PER_SAMPLE  (2)
-
-#define MAX_RSP_DEVICES  (4)
-
-std::set<std::string> &SoapySDRPlay_getClaimedSerials(void);
 
 class SoapySDRPlay: public SoapySDR::Device
 {
@@ -106,6 +99,15 @@ public:
                    long long &timeNs,
                    const long timeoutUs = 200000);
 
+    class Buffer;
+    int readChannel(SoapySDR::Stream *stream,
+                    void *buff,
+                    const size_t numElems,
+                    int &flags,
+                    long long &timeNs,
+                    const long timeoutUs,
+                    Buffer *daBuf);
+
     /*******************************************************************
      * Direct buffer access API
      ******************************************************************/
@@ -119,7 +121,8 @@ public:
                           const void **buffs,
                           int &flags,
                           long long &timeNs,
-                          const long timeoutUs = 100000);
+                          const long timeoutUs = 100000,
+                          Buffer *daBuf = 0);
 
     void releaseReadBuffer(SoapySDR::Stream *stream, const size_t handle);
 
@@ -211,15 +214,17 @@ public:
 
     void writeSetting(const std::string &key, const std::string &value);
 
+    void changeRspDuoMode(const std::string &rspDuoModeString);
+
     std::string readSetting(const std::string &key) const;
 
     /*******************************************************************
      * Async API
      ******************************************************************/
 
-    void rx_callback(short *xi, short *xq, unsigned int numSamples);
+    void rx_callback(short *xi, short *xq, unsigned int numSamples, sdrplay_api_TunerSelectT tuner);
 
-    void gr_callback(unsigned int gRdB, unsigned int lnaGRdB);
+    void ev_callback(sdrplay_api_EventT eventId, sdrplay_api_TunerSelectT tuner, sdrplay_api_EventParamsT *params);
 
 private:
 
@@ -227,43 +232,38 @@ private:
      * Internal functions
      ******************************************************************/
 
-    static double getRateForBwEnum(mir_sdr_Bw_MHzT bwEnum);
+    static double getRateForBwEnum(sdrplay_api_Bw_MHzT bwEnum);
 
-    static uint32_t getInputSampleRateAndDecimation(uint32_t rate, unsigned int *decM, unsigned int *decEnable, mir_sdr_If_kHzT ifMode);
+    static uint32_t getInputSampleRateAndDecimation(uint32_t rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT ifMode);
 
-    static mir_sdr_Bw_MHzT getBwEnumForRate(double rate, mir_sdr_If_kHzT ifMode);
+    static sdrplay_api_Bw_MHzT getBwEnumForRate(double rate, sdrplay_api_If_kHzT ifMode);
 
-    static  double getBwValueFromEnum(mir_sdr_Bw_MHzT bwEnum);
+    static  double getBwValueFromEnum(sdrplay_api_Bw_MHzT bwEnum);
 
-    static mir_sdr_Bw_MHzT mirGetBwMhzEnum(double bw);
+    static sdrplay_api_Bw_MHzT sdrPlayGetBwMhzEnum(double bw);
 
-    static mir_sdr_If_kHzT stringToIF(std::string ifMode);
+    static sdrplay_api_TunerSelectT rspDuoModeStringToTuner(std::string rspDuoMode);
 
-    static std::string IFtoString(mir_sdr_If_kHzT ifkHzT);
+    static sdrplay_api_RspDuoModeT rspDuoModeStringToRspDuoMode(std::string rspDuoMode);
+
+    static std::string rspDuoModetoString(sdrplay_api_TunerSelectT tuner, sdrplay_api_RspDuoModeT rspDuoMode);
+
+    static sdrplay_api_If_kHzT stringToIF(std::string ifMode);
+
+    static std::string IFtoString(sdrplay_api_If_kHzT ifkHzT);
 
     /*******************************************************************
      * Private variables
      ******************************************************************/
     //device settings
-    mir_sdr_Bw_MHzT bwMode;
-    mir_sdr_If_kHzT ifMode;
+    sdrplay_api_DeviceT device;
+    sdrplay_api_DeviceParamsT *deviceParams;
+    sdrplay_api_RxChannelParamsT *chParams;
     float ver;
 
-    int gRdB;
-    std::atomic_int current_gRdB;
-    int gRdBsystem;
-    int sps;
-    int lnaState;
-    int hwVer;
-
     //cached settings
-    uint32_t sampleRate;
     uint32_t reqSampleRate;
-    unsigned int decM;
-    unsigned int decEnable;
-    uint32_t centerFrequency;
-    double ppm;
-    std::atomic_int bufferLength;
+    std::atomic_ulong bufferLength;
 
     //numBuffers, bufferElems, elementsPerSample
     //are indeed constants
@@ -273,23 +273,11 @@ private:
 
     std::atomic_uint shortsPerWord;
  
-    mir_sdr_AgcControlT agcMode;
     std::atomic_bool streamActive;
-  
-    bool dcOffsetMode;
+
     std::atomic_bool useShort;
 
-    unsigned int IQcorr;
-    int setPoint;
-
-    mir_sdr_RSPII_AntennaSelectT antSel;
-    mir_sdr_rspDuo_TunerSelT tunSel;
-    int amPort;
-    unsigned int extRef;
-    unsigned int biasTen;
-    unsigned int notchEn;
-    unsigned int dabNotchEn;
-    std::string serNo;
+    int nchannels;
 
 public:
 
@@ -299,6 +287,7 @@ public:
     
     mutable std::mutex _general_state_mutex;
 
+#if 0
     std::mutex _buf_mutex;
     std::condition_variable _buf_cond;
 
@@ -311,4 +300,27 @@ public:
     std::atomic_size_t bufferedElems;
     size_t _currentHandle;
     std::atomic_bool resetBuffer;
+#endif
+
+    class Buffer
+    {
+    public:
+        Buffer(size_t numBuffers, unsigned long bufferLength);
+        ~Buffer(void);
+
+        std::mutex mutex;
+        std::condition_variable cond;
+
+        std::vector<std::vector<short> > buffs;
+        size_t      head;
+        size_t      tail;
+        size_t      count;
+        short *currentBuff;
+        bool overflowEvent;
+        std::atomic_size_t nElems;
+        size_t currentHandle;
+        std::atomic_bool reset;
+    };
+
+    Buffer *_bufA, *_bufB;
 };
