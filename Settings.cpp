@@ -725,22 +725,22 @@ std::vector<double> SoapySDRPlay::listSampleRates(const int direction, const siz
 
 uint32_t SoapySDRPlay::getInputSampleRateAndDecimation(uint32_t rate, unsigned int *decM, unsigned int *decEnable, sdrplay_api_If_kHzT ifType)
 {
-   if (ifType == sdrplay_api_IF_2_048)
-   {
-      if      (rate == 2048000) { *decM = 4; *decEnable = 1; return 8192000; }
-   }
-   else if (ifType == sdrplay_api_IF_0_450)
-   {
-      if      (rate == 1000000) { *decM = 2; *decEnable = 1; return 2000000; }
-      else if (rate == 500000)  { *decM = 4; *decEnable = 1; return 2000000; }
-   }
-   else if (ifType == sdrplay_api_IF_Zero)
-   {
-
-      if      ((rate >= 200000)  && (rate < 500000))  { *decM = 8; *decEnable = 1; return 2000000; }
-      else if ((rate >= 500000)  && (rate < 1000000)) { *decM = 4; *decEnable = 1; return 2000000; }
-      else if ((rate >= 1000000) && (rate < 2000000)) { *decM = 2; *decEnable = 1; return 2000000; }
-      else                                            { *decM = 1; *decEnable = 0; return rate; }
+    if (ifType == sdrplay_api_IF_2_048)
+    {
+        if      (rate == 2048000) { *decM = 4; *decEnable = 1; return 8192000; }
+    }
+    else if (ifType == sdrplay_api_IF_0_450)
+    {
+        if      (rate == 1000000) { *decM = 2; *decEnable = 1; return 2000000; }
+        else if (rate == 500000)  { *decM = 4; *decEnable = 1; return 2000000; }
+    }
+    else if (ifType == sdrplay_api_IF_Zero)
+    {
+        if      ((rate >=  125000) && (rate  < 250000)) { *decM = 16; *decEnable = 1; return rate * 16; }
+        else if ((rate >=  250000) && (rate <  500000)) { *decM =  8; *decEnable = 1; return rate *  8; }
+        else if ((rate >=  500000) && (rate < 1000000)) { *decM =  4; *decEnable = 1; return rate *  4; }
+        else if ((rate >= 1000000) && (rate < 2000000)) { *decM =  2; *decEnable = 1; return rate *  2; }
+        else                                            { *decM =  1; *decEnable = 0; return rate; }
    }
 
    // this is invalid, but return something
