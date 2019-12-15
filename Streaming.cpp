@@ -280,7 +280,8 @@ int SoapySDRPlay::activateStream(SoapySDR::Stream *stream,
 
     // Enable (= sdrplay_api_DbgLvl_Verbose) API calls tracing,
     // but only for debug purposes due to its performance impact.
-    sdrplay_api_DebugEnable(device.dev, sdrplay_api_DbgLvl_Disable);
+    //sdrplay_api_DebugEnable(device.dev, sdrplay_api_DbgLvl_Disable);
+    sdrplay_api_DebugEnable(device.dev, sdrplay_api_DbgLvl_Verbose);
 
     // temporary fix for ARM targets.
 #if defined(__arm__) || defined(__aarch64__)
