@@ -5,9 +5,9 @@
 * https://github.com/pothosware/SoapySDRPlay/wiki
 
 ## RSPdx/RSPduo (master/slave)
-Note: For RSPdx or RSPduo (master/slave) support, use the API 3 version
-The API 3 version supports ALL RSPs
-You can get the API 3 version here: https://github.com/SDRplay/SoapySDRPlay
+Note: For RSPdx or RSPduo (master/slave) support, use the API 3 version<br />
+The API 3 version supports ALL RSPs<br />
+You can get the API 3 version here: https://github.com/SDRplay/SoapySDRPlay<br />
 
 ## Dependencies
 
