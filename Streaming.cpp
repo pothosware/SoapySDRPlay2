@@ -283,11 +283,6 @@ int SoapySDRPlay::readStream(SoapySDR::Stream *stream,
                              long long &timeNs,
                              const long timeoutUs)
 {   
-    if (!streamActive) 
-    {
-        return 0;
-    }
-    
     // this is the user's buffer for channel 0
     void *buff0 = buffs[0];
     
