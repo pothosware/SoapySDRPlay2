@@ -88,6 +88,17 @@ SoapySDRPlay::SoapySDRPlay(const SoapySDR::Kwargs &args)
     notchEn = 0;
     dabNotchEn = 0;
 
+    // process additional device string arguments
+    for (std::pair<std::string, std::string> arg : args) {
+        // ignore 'driver', 'label', 'mode', 'serial', and 'soapy'
+        if (arg.first == "driver" || arg.first == "label" ||
+            arg.first == "mode" || arg.first == "serial" ||
+            arg.first == "soapy") {
+            continue;
+        }
+        writeSetting(arg.first, arg.second);
+    }
+
     bufferedElems = 0;
     _currentBuff = 0;
     resetBuffer = false;
